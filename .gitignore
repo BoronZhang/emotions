@@ -1,0 +1,8 @@
+WESAD/**
+__pycache__/**
+log.txt
+report/report.aux
+report/report.log
+report/report.out
+report/report.synctex.gz
+report/report.toc
