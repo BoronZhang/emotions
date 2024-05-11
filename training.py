@@ -79,7 +79,7 @@ class Trainer:
     
 
 class WESADTrainer:
-    def __init__(self, models_params:dict[Callable, dict[str, list]], sensor:str, base_folder:str='WESAD/', data_prefix='raw', subjects=[]) -> None:
+    def __init__(self, models_params:dict[Callable, dict[str, list]], sensor:str, base_folder:str='WESAD/', data_prefix='raw', subjects=[], classes=[1, 2, 3, 4]) -> None:
         """
         Parameters
         ----
@@ -93,6 +93,7 @@ class WESADTrainer:
         self.path = base_folder + "%s/" + data_prefix + "_data/" + sensor + ".csv"
         self.models_params = models_params
         self.subjects = subjects
+        self.classes = classes
         
         
     def predict_all(self, verbose=0):
@@ -108,8 +109,14 @@ class WESADTrainer:
             test = f"S{testNo}"
             if verbose:print(f"Testing {test}")
             inputs:pd.DataFrame = self.load_data(test=test, verbose=verbose) # a pd.DataFrame
+            
             self.fit(df=inputs, verbose=verbose) # apres, models are in self._best_estimator
             test_df = pd.read_csv(self.path % test)
+            last_label = max(self.classes) + 1
+            for label in test_df['label'].unique():
+                if label not in self.classes:
+                    test_df.loc[test_df['label'] == label, 'label'] = last_label
+
             report = self.report(test_df)
             self.X_test = test_df
             self.y_pred = self.prediction
@@ -141,7 +148,13 @@ class WESADTrainer:
             s = f"S{s_num}"
             if '.' in s and s != test: #subjects are in the folders
                 continue
-            inputs.append(pd.read_csv(self.path % s))
+            df = pd.read_csv(self.path % s)
+            last_label = max(self.classes) + 1
+            for label in df['label'].unique():
+                if label not in self.classes:
+                    df.loc[df['label'] == label, 'label'] = last_label
+
+            inputs.append(df)
         if verbose:
             print()
         return pd.concat(inputs)
@@ -168,18 +181,6 @@ class WESADTrainer:
         self.predict(X_test=X_test, verbose=verbose)
         report = classification_report(y_true=y_test, y_pred=self.prediction, output_dict=True)
         return report
-
-
-
-
-
-            
-
-        
-        
-
-
-
-        
-
+    
+    
 
