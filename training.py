@@ -47,7 +47,7 @@ class Trainer:
                 start_time:float = time.time()
             model.fit(self.X_train, self.y_train)
             if verbose:
-                print(f"\rTraining {model.estimator} completed in {time.time() - start_time} secs")
+                print(f"\rTraining {model.estimator} completed in {time.time() - start_time} secs (score={model.best_score_})")
 
             
             if model.best_score_ > self._f1_avg:
@@ -108,16 +108,14 @@ class WESADTrainer:
         for testNo in self.subjects:
             test = f"S{testNo}"
             if verbose:print(f"Testing {test}")
-            inputs:pd.DataFrame = self.load_data(test=test, verbose=verbose) # a pd.DataFrame
+            inputs:pd.DataFrame = self.load_data(test=test, verbose=verbose) # a pd.DataFrame of all except the test
+            if verbose:print(f"input of size {inputs.shape}")
             
             self.fit(df=inputs, verbose=verbose) # apres, models are in self._best_estimator
             test_df = pd.read_csv(self.path % test)
-            last_label = max(self.classes) + 1
-            for label in test_df['label'].unique():
-                if label not in self.classes:
-                    test_df.loc[test_df['label'] == label, 'label'] = last_label
+            test_df = self.shrink_classes(test_df)
 
-            report = self.report(test_df)
+            report = self.report(test_df, verbose=verbose)
             self.X_test = test_df
             self.y_pred = self.prediction
 
@@ -140,19 +138,22 @@ class WESADTrainer:
         return total_res
             
             
-
+    def shrink_classes(self, df:pd.DataFrame):
+        last_label = max(self.classes) + 1
+        for label in df['label'].unique():
+            if label not in self.classes:
+                df.loc[df['label'] == label, 'label'] = last_label
+        return df
 
     def load_data(self, test, verbose:int=0):
         inputs:list[pd.DataFrame] = []
         for s_num in self.subjects:
             s = f"S{s_num}"
-            if '.' in s and s != test: #subjects are in the folders
+            if '.' in s or s == test: #subjects are in the folders, skip files and test
+                if verbose > 1 and s == test:print(f"test #{s} skipped")
                 continue
             df = pd.read_csv(self.path % s)
-            last_label = max(self.classes) + 1
-            for label in df['label'].unique():
-                if label not in self.classes:
-                    df.loc[df['label'] == label, 'label'] = last_label
+            df = self.shrink_classes(df)
 
             inputs.append(df)
         if verbose:
@@ -171,7 +172,7 @@ class WESADTrainer:
         
     def predict(self, X_test:pd.DataFrame, verbose:int=0):
         pred = self._best_estimator.predict(X_test)
-        print(f"predicting df of size {X_test.shape}, made {pred.shape}")
+        if verbose:print(f"predicting df of size {X_test.shape}, made {pred.shape}")
         self.prediction = pred
         return pred
     
