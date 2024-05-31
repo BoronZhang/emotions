@@ -20,11 +20,8 @@ class WESADLoader(torch.utils.data.Dataset):
         return len(self.files)
 
     def __getitem__(self, index):
-        log = ""
-        log += f"Getting {index}\n"
         with open(self.files[index], 'rb') as pklfile:
             sample = pickle.load(pklfile, encoding='bytes')
-        log += f"{index} loaded\n"
         
         arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
         X = np.concatenate(arrays)
@@ -33,10 +30,11 @@ class WESADLoader(torch.utils.data.Dataset):
         Y = torch.from_numpy(Y)
         # from default 200Hz to ?
         # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
+        
         if X.shape[1] < self.common_shape:
             adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
             X = torch.concat((X, adding), dim=1)
-            adding = torch.ones(self.common_shape - X.shape[1])
+            adding = torch.ones(self.common_shape - Y.shape[0])
             Y = torch.concat((Y, adding), dim=0)
         else:
             X = X[:, :self.common_shape]
@@ -45,9 +43,6 @@ class WESADLoader(torch.utils.data.Dataset):
             np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
             + 1e-8
         )
-        log += f"In loader: |X|={X.shape}, |y|={Y.shape}\n"
-        with open("logs_loader.txt", 'a') as file:
-            file.write(log)
         
         return X, Y
 
