@@ -13,23 +13,42 @@ from scipy.signal import butter, lfilter
 class WESADLoader(torch.utils.data.Dataset):
     def __init__(self, files, sampling_rate=200):
         self.files = files
-        self.default_rate = 200
         self.sampling_rate = sampling_rate
+        self.common_shape = 3000
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, index):
-        sample = pd.read_csv(self.files[index])
-        X = sample["X"]
+        log = ""
+        log += f"Getting {index}\n"
+        with open(self.files[index], 'rb') as pklfile:
+            sample = pickle.load(pklfile, encoding='bytes')
+        log += f"{index} loaded\n"
+        
+        arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
+        X = np.concatenate(arrays)
+        X = torch.FloatTensor(X)
+        Y = sample['label'].mean(1).astype(np.int64)
+        Y = torch.from_numpy(Y)
         # from default 200Hz to ?
-        X = resample(X, 10 * self.sampling_rate, axis=-1)
+        # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
+        if X.shape[1] < self.common_shape:
+            adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
+            X = torch.concat((X, adding), dim=1)
+            adding = torch.ones(self.common_shape - X.shape[1])
+            Y = torch.concat((Y, adding), dim=0)
+        else:
+            X = X[:, :self.common_shape]
+            Y = Y[:self.common_shape]
         X = X / (
             np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
             + 1e-8
         )
-        Y = sample["y"]
-        X = torch.FloatTensor(X)
+        log += f"In loader: |X|={X.shape}, |y|={Y.shape}\n"
+        with open("logs_loader.txt", 'a') as file:
+            file.write(log)
+        
         return X, Y
 
 

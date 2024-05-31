@@ -3,6 +3,8 @@ import argparse
 import pickle
 
 import torch
+import torch.utils
+import torch.utils.data
 from tqdm import tqdm
 import numpy as np
 import torch.nn as nn
@@ -14,7 +16,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pyhealth.metrics import binary_metrics_fn
 
-from model import (
+from .model import (
     SPaRCNet,
     ContraWR,
     CNNTransformer,
@@ -22,7 +24,7 @@ from model import (
     STTransformer,
     BIOTClassifier,
 )
-from utils import WESADLoader, TUABLoader, CHBMITLoader, PTBLoader, focal_loss, BCE
+from .utils import WESADLoader, TUABLoader, CHBMITLoader, PTBLoader, focal_loss, BCE
 
 
 class LitModel_finetune(pl.LightningModule):
@@ -168,6 +170,50 @@ def prepare_WESAD_dataloader(args):
     print(f"train size: {len(train_loader)}, val size: {len(val_loader)}, test size: {len(test_loader)}")
     return train_loader, test_loader, val_loader
 
+def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_workers=4):
+    # set random seed
+    seed = 12345
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+
+    root = os.path.abspath(os.curdir) + "/WESAD/"
+    file_path = root + "S{s}/S{s}_n0.pkl"
+    train_files = [file_path.format(s=i)  for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
+    np.random.shuffle(train_files)
+    # train_files = train_files[:100000]
+    val_files = [file_path.format(s=i) for i in [13, 14, 15, 16]]
+    test_files = [file_path.format(s=i) for i in [17]]
+
+    print(f"Len of train: {len(train_files)}, val: {len(val_files)}, test: {len(test_files)}")
+
+    # prepare training and test data loader
+    train_loader = torch.utils.data.DataLoader(
+        WESADLoader(train_files, sampling_rate),
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=False,
+        num_workers=num_workers,
+        persistent_workers=True,
+    )
+    test_loader = torch.utils.data.DataLoader(
+        WESADLoader(test_files, sampling_rate),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        persistent_workers=True,
+    )
+    val_loader = torch.utils.data.DataLoader(
+        WESADLoader(val_files, sampling_rate),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        persistent_workers=True,
+    )
+    print(f"train size: {len(train_loader)}, val size: {len(val_loader)}, test size: {len(test_loader)}")
+    return train_loader, test_loader, val_loader
+
 
 def prepare_TUAB_dataloader(args):
     # set random seed
@@ -305,9 +351,14 @@ def prepare_PTB_dataloader(args):
 
 
 def supervised(args):
+    print("Welcome")
     # get data loaders
     if args.dataset == "TUAB":
         train_loader, test_loader, val_loader = prepare_TUAB_dataloader(args)
+
+    elif args.dataset == "WESAD":
+        print(f"Dataset: WESAD")
+        train_loader, test_loader, val_loader = prepare_WESAD_dataloader(args)
 
     else:
         raise NotImplementedError
@@ -427,10 +478,10 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int,
                         default=512, help="batch size")
     parser.add_argument("--num_workers", type=int,
-                        default=32, help="number of workers")
-    parser.add_argument("--dataset", type=str, default="TUAB", help="dataset")
+                        default=4, help="number of workers")
+    parser.add_argument("--dataset", type=str, default="WEASD", help="dataset")
     parser.add_argument(
-        "--model", type=str, default="SPaRCNet", help="which supervised model to use"
+        "--model", type=str, default="BIOT", help="which supervised model to use"
     )
     parser.add_argument(
         "--in_channels", type=int, default=16, help="number of input channels"
