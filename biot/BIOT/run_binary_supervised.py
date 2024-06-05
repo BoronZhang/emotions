@@ -33,12 +33,22 @@ class LitModel_finetune(pl.LightningModule):
         self.model = model
         self.threshold = 0.5
         self.args = args
+        self.train_step_outputs = []
+        self.val_step_outputs = []
+        self.test_step_outputs = []
+        
+
+    def on_train_epoch_end(self):
+        epoch_average = torch.stack(self.training_step_outputs).mean()
+        self.log("training_epoch_average", epoch_average)
+        self.train_step_outputs.clear()  # free memory
 
     def training_step(self, batch, batch_idx):
         X, y = batch
         prob = self.model(X)
         loss = BCE(prob, y)  # focal_loss(prob, y)
         self.log("train_loss", loss)
+        self.train_step_outputs.append(loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -47,12 +57,13 @@ class LitModel_finetune(pl.LightningModule):
             prob = self.model(X)
             step_result = torch.sigmoid(prob).cpu().numpy()
             step_gt = y.cpu().numpy()
+        self.val_step_outputs.append((step_result, step_gt))
         return step_result, step_gt
 
-    def validation_epoch_end(self, val_step_outputs):
+    def on_validation_epoch_end(self):
         result = np.array([])
         gt = np.array([])
-        for out in val_step_outputs:
+        for out in self.val_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
 
@@ -85,12 +96,13 @@ class LitModel_finetune(pl.LightningModule):
             convScore = self.model(X)
             step_result = torch.sigmoid(convScore).cpu().numpy()
             step_gt = y.cpu().numpy()
+        self.test_step_outputs.append((step_result, step_gt))
         return step_result, step_gt
 
-    def test_epoch_end(self, test_step_outputs):
+    def on_test_epoch_end(self):
         result = np.array([])
         gt = np.array([])
-        for out in test_step_outputs:
+        for out in self.test_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
         if (
@@ -134,7 +146,7 @@ def prepare_WESAD_dataloader(args):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
 
-    root = "/WESAD/"
+    root = os.path.abspath(os.curdir) + "/WESAD/"
     file_path = root + "S{s}/S{s}_n0.pkl"
     train_files = [file_path.format(s=i)  for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
     np.random.shuffle(train_files)
@@ -142,7 +154,7 @@ def prepare_WESAD_dataloader(args):
     val_files = [file_path.format(s=i) for i in [13, 14, 15, 16]]
     test_files = [file_path.format(s=i) for i in [17]]
 
-    print(len(train_files), len(val_files), len(test_files))
+    print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
     train_loader = torch.utils.data.DataLoader(
@@ -167,7 +179,7 @@ def prepare_WESAD_dataloader(args):
         num_workers=args.num_workers,
         persistent_workers=True,
     )
-    print(f"train size: {len(train_loader)}, val size: {len(val_loader)}, test size: {len(test_loader)}")
+    print(f"Size of loader of:\n\tTrain: {len(train_loader)}\n\tVal:   {len(val_loader)}\n\tTest:  {len(test_loader)}")
     return train_loader, test_loader, val_loader
 
 def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_workers=4):
@@ -445,10 +457,10 @@ def supervised(args):
     )
 
     trainer = pl.Trainer(
-        devices=[0],
-        accelerator="gpu",
-        strategy=DDPStrategy(find_unused_parameters=False),
-        auto_select_gpus=True,
+        devices="auto",
+        accelerator="cpu",
+        # strategy=DDPStrategy(find_unused_parameters=False),
+        # auto_select_gpus=True,
         benchmark=True,
         enable_checkpointing=True,
         logger=logger,
@@ -479,7 +491,7 @@ if __name__ == "__main__":
                         default=512, help="batch size")
     parser.add_argument("--num_workers", type=int,
                         default=4, help="number of workers")
-    parser.add_argument("--dataset", type=str, default="WEASD", help="dataset")
+    parser.add_argument("--dataset", type=str, default="WESAD", help="dataset")
     parser.add_argument(
         "--model", type=str, default="BIOT", help="which supervised model to use"
     )
@@ -504,6 +516,6 @@ if __name__ == "__main__":
         "--pretrain_model_path", type=str, default="", help="pretrained model path"
     )
     args = parser.parse_args()
-    print(args)
+    print(f"Args: {args}")
 
     supervised(args)

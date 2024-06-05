@@ -1,4 +1,13 @@
-WESAD/**
+WESAD/*/data
+WESAD/*/manual_data
+WESAD/*/raw_data
+WESAD/*/svd_data
+WESAD/*/S[0-9].pkl
+WESAD/*/S[0-9][0-9].pkl
+WESAD/*/*.csv
+WESAD/*/*.txt
+WESAD/total.pkl
+WESAD/wesad_readme.pdf
 __pycache__/**
 log.txt
 report/report.aux
