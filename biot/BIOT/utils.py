@@ -11,40 +11,64 @@ from scipy.signal import butter, lfilter
 
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, sampling_rate=200):
+    def __init__(self, files, window_size=10, sampling_rate=200):
+        """
+        Parameters:
+        ----
+        `files`: list of str
+        the path to files
+        `window_size`: int
+        the window size in second, each item size will be (`channels`, `window_size` * `sampling_rate`)
+        """
         self.files = files
         self.sampling_rate = sampling_rate
         self.common_shape = 3000
+        self.window = window_size
+        print(f"window size = {window_size}")
+        self.opened_file:tuple[torch.Tensor, torch.Tensor] = (torch.tensor([]), torch.tensor([]))
 
     def __len__(self):
-        return len(self.files)
+        return len(self.files * self.window)
 
     def __getitem__(self, index):
-        with open(self.files[index], 'rb') as pklfile:
-            sample = pickle.load(pklfile, encoding='bytes')
+        file_index = index // self.window
+        window_index  = (index % self.window) * self.window * self.sampling_rate
+        if window_index == 0:
+            with open(self.files[file_index], 'rb') as pklfile:
+                sample = pickle.load(pklfile, encoding='bytes')
+            
+            arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
+            X = np.concatenate(arrays)
+            X = torch.FloatTensor(X)
+            Y = sample['label'].mean(1).astype(np.int64)
+            Y = torch.from_numpy(Y)
+            # from default 200Hz to ?
+            # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
+            
+            # reshaping to a common shape (doesn't have a lot of effect)
+            if X.shape[1] < self.common_shape:
+                adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
+                X = torch.concat((X, adding), dim=1)
+                adding = torch.ones(self.common_shape - Y.shape[0])
+                Y = torch.concat((Y, adding), dim=0)
+            else:
+                X = X[:, :self.common_shape]
+                Y = Y[:self.common_shape]
+            X = X / (
+                torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
+                # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
+                + 1e-8
+            )
+            with open("log.txt", "a") as file:
+                file.write(f"In loader main X = {X.shape}, y = {Y.shape}\n")
         
-        arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
-        X = np.concatenate(arrays)
-        X = torch.FloatTensor(X)
-        Y = sample['label'].mean(1).astype(np.int64)
-        Y = torch.from_numpy(Y)
-        # from default 200Hz to ?
-        # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
+            self.opened_file = (X, Y)
         
-        if X.shape[1] < self.common_shape:
-            adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
-            X = torch.concat((X, adding), dim=1)
-            adding = torch.ones(self.common_shape - Y.shape[0])
-            Y = torch.concat((Y, adding), dim=0)
-        else:
-            X = X[:, :self.common_shape]
-            Y = Y[:self.common_shape]
-        X = X / (
-            np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
-            + 1e-8
-        )
-        
-        return X, Y
+        x = self.opened_file[0][:, window_index:window_index + self.window*self.sampling_rate]
+        y = self.opened_file[1][window_index:window_index + self.window*self.sampling_rate]
+        with open("log.txt", "a") as file:
+            file.write(f"In loader, window ind = {(index % self.window)} * {self.window} X = {x.shape}, y = {y.shape}\n")
+        return x, y
 
 
 

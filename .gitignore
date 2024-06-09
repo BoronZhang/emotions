@@ -6,6 +6,7 @@ WESAD/*/S[0-9].pkl
 WESAD/*/S[0-9][0-9].pkl
 WESAD/*/*.csv
 WESAD/*/*.txt
+WESAD/
 WESAD/total.pkl
 WESAD/wesad_readme.pdf
 __pycache__/**
@@ -15,3 +16,4 @@ report/report.log
 report/report.out
 report/report.synctex.gz
 report/report.toc
+log/

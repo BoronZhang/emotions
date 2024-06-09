@@ -47,16 +47,25 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         prob = self.model(X)
         loss = BCE(prob, y)  # focal_loss(prob, y)
+        print("In train")
+        print(f"\t\033[94mX = {X.shape}")
+        print(f"\t\033[94my = {y.shape}")
+        print(f"\t\033[94mProb = {prob.shape}")
+        print(f"\t\033[94mLoss = {loss.shape}")
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         X, y = batch
+        print(f"\n\033[94mX = {X.shape}")
+        print(f"\n\033[94my = {y.shape}")
         with torch.no_grad():
             prob = self.model(X)
+            print(f"\033[94mProb = {prob.shape}\033[0m")
             step_result = torch.sigmoid(prob).cpu().numpy()
             step_gt = y.cpu().numpy()
+
         self.val_step_outputs.append((step_result, step_gt))
         return step_result, step_gt
 
@@ -66,7 +75,9 @@ class LitModel_finetune(pl.LightningModule):
         for out in self.val_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
-
+        print(f"\n\033[94mResult: {result}")
+        print(f"\n\033[94mgt = {gt}")
+        
         if (
             sum(gt) * (len(gt) - sum(gt)) != 0
         ):  # to prevent all 0 or all 1 and raise the AUROC error
@@ -147,7 +158,10 @@ def prepare_WESAD_dataloader(args):
     np.random.seed(seed)
 
     root = os.path.abspath(os.curdir) + "/WESAD/"
-    file_path = root + "S{s}/S{s}_n0.pkl"
+    if args.server == "pc":
+        file_path = root + "S{s}/S{s}_n0.pkl"
+    elif args.server == "colab":
+        file_path = root + "S{s}_n0.pkl"
     train_files = [file_path.format(s=i)  for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
     np.random.shuffle(train_files)
     # train_files = train_files[:100000]
@@ -158,7 +172,7 @@ def prepare_WESAD_dataloader(args):
 
     # prepare training and test data loader
     train_loader = torch.utils.data.DataLoader(
-        WESADLoader(train_files, args.sampling_rate),
+        WESADLoader(files=train_files, sampling_rate=args.sampling_rate),
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
@@ -166,14 +180,14 @@ def prepare_WESAD_dataloader(args):
         persistent_workers=True,
     )
     test_loader = torch.utils.data.DataLoader(
-        WESADLoader(test_files, args.sampling_rate),
+        WESADLoader(files=test_files, sampling_rate=args.sampling_rate),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         persistent_workers=True,
     )
     val_loader = torch.utils.data.DataLoader(
-        WESADLoader(val_files, args.sampling_rate),
+        WESADLoader(files=val_files, sampling_rate=args.sampling_rate),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
@@ -202,7 +216,7 @@ def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_worke
 
     # prepare training and test data loader
     train_loader = torch.utils.data.DataLoader(
-        WESADLoader(train_files, sampling_rate),
+        WESADLoader(files=train_files, sampling_rate=sampling_rate),
         batch_size=batch_size,
         shuffle=True,
         drop_last=False,
@@ -210,14 +224,14 @@ def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_worke
         persistent_workers=True,
     )
     test_loader = torch.utils.data.DataLoader(
-        WESADLoader(test_files, sampling_rate),
+        WESADLoader(files=test_files, sampling_rate=sampling_rate),
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         persistent_workers=True,
     )
     val_loader = torch.utils.data.DataLoader(
-        WESADLoader(val_files, sampling_rate),
+        WESADLoader(files=val_files, sampling_rate=sampling_rate),
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
