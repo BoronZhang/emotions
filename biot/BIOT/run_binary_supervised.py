@@ -39,7 +39,7 @@ class LitModel_finetune(pl.LightningModule):
         
 
     def on_train_epoch_end(self):
-        epoch_average = torch.stack(self.training_step_outputs).mean()
+        epoch_average = torch.stack(self.train_step_outputs).mean()
         self.log("training_epoch_average", epoch_average)
         self.train_step_outputs.clear()  # free memory
 
@@ -47,22 +47,22 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         prob = self.model(X)
         loss = BCE(prob, y)  # focal_loss(prob, y)
-        print("In train")
-        print(f"\t\033[94mX = {X.shape}")
-        print(f"\t\033[94my = {y.shape}")
-        print(f"\t\033[94mProb = {prob.shape}")
-        print(f"\t\033[94mLoss = {loss.shape}")
+        # print("In train")
+        # print(f"\t\033[94mX = {X.shape}\033[0m")
+        # print(f"\t\033[94my = {y.shape}\033[0m")
+        # print(f"\t\033[94mProb = {prob.shape}\033[0m")
+        # print(f"\t\033[94mLoss = {loss.shape}\033[0m")
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         X, y = batch
-        print(f"\n\033[94mX = {X.shape}")
-        print(f"\n\033[94my = {y.shape}")
+        # print(f"\n\033[94mX = {X.shape}\033[0m")
+        # print(f"\n\033[94my = {y.shape}\033[0m")
         with torch.no_grad():
             prob = self.model(X)
-            print(f"\033[94mProb = {prob.shape}\033[0m")
+            # print(f"\033[94mProb = {prob.shape}\033[0m")
             step_result = torch.sigmoid(prob).cpu().numpy()
             step_gt = y.cpu().numpy()
 
@@ -75,8 +75,8 @@ class LitModel_finetune(pl.LightningModule):
         for out in self.val_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
-        print(f"\n\033[94mResult: {result}")
-        print(f"\n\033[94mgt = {gt}")
+        # print(f"\n\033[94mResult: {result}\033[0m")
+        # print(f"\n\033[94mgt = {gt}\033[0m")
         
         if (
             sum(gt) * (len(gt) - sum(gt)) != 0
@@ -222,6 +222,7 @@ def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_worke
         drop_last=False,
         num_workers=num_workers,
         persistent_workers=True,
+        # collate_fn=
     )
     test_loader = torch.utils.data.DataLoader(
         WESADLoader(files=test_files, sampling_rate=sampling_rate),

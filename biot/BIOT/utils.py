@@ -11,7 +11,7 @@ from scipy.signal import butter, lfilter
 
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, window_size=10, sampling_rate=200):
+    def __init__(self, files, window_size=1, sampling_rate=200):
         """
         Parameters:
         ----
@@ -24,16 +24,18 @@ class WESADLoader(torch.utils.data.Dataset):
         self.sampling_rate = sampling_rate
         self.common_shape = 3000
         self.window = window_size
-        print(f"window size = {window_size}")
         self.opened_file:tuple[torch.Tensor, torch.Tensor] = (torch.tensor([]), torch.tensor([]))
+        self.windows_in_file = self.common_shape // (self.window * self.sampling_rate)
 
     def __len__(self):
-        return len(self.files * self.window)
+        return len(self.files * self.windows_in_file)
 
     def __getitem__(self, index):
-        file_index = index // self.window
-        window_index  = (index % self.window) * self.window * self.sampling_rate
-        if window_index == 0:
+        file_index = index // self.windows_in_file
+        window_index  = (index % self.windows_in_file) * self.window * self.sampling_rate
+        with open("log.txt", "a") as file:
+            file.write(f"In loader index = {index}, file index = {file_index}, window ind = {window_index}\n")
+        if len(self.opened_file[0]) == 0:
             with open(self.files[file_index], 'rb') as pklfile:
                 sample = pickle.load(pklfile, encoding='bytes')
             
@@ -61,14 +63,31 @@ class WESADLoader(torch.utils.data.Dataset):
             )
             with open("log.txt", "a") as file:
                 file.write(f"In loader main X = {X.shape}, y = {Y.shape}\n")
-        
             self.opened_file = (X, Y)
+        
         
         x = self.opened_file[0][:, window_index:window_index + self.window*self.sampling_rate]
         y = self.opened_file[1][window_index:window_index + self.window*self.sampling_rate]
+        y = y[0]
+        y = 1 if y == 2 else 0
+        y = torch.tensor([y])
         with open("log.txt", "a") as file:
             file.write(f"In loader, window ind = {(index % self.window)} * {self.window} X = {x.shape}, y = {y.shape}\n")
         return x, y
+
+def collate_fn_WESAD_pretrain(batch):
+    prest_samples, shhs_samples = [], []
+    for sample, flag in batch:
+        if flag == 0:
+            prest_samples.append(sample)
+        else:
+            shhs_samples.append(sample)
+
+    shhs_samples = torch.stack(shhs_samples, 0)
+    if len(prest_samples) > 0:
+        prest_samples = torch.cat(prest_samples, 0)
+        return prest_samples, shhs_samples
+    return 0, shhs_samples
 
 
 
