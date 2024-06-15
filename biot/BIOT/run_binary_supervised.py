@@ -1,6 +1,7 @@
 import os
 import argparse
 import pickle
+import random
 
 import torch
 import torch.utils
@@ -162,13 +163,17 @@ def prepare_WESAD_dataloader(args):
         file_path = root + "S{s}/S{s}_n0.pkl"
     elif args.server == "colab":
         file_path = root + "S{s}_n0.pkl"
-    train_files = [file_path.format(s=i)  for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
+    All_files = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]
+    All_files = [i for i in All_files if i != args.test]
+    val_indices = random.sample(range(len(All_files)), k=4)
+    train_files = [file_path.format(s=All_files[i])  for i in range(len(All_files)) if i not in val_indices]
     np.random.shuffle(train_files)
     # train_files = train_files[:100000]
-    val_files = [file_path.format(s=i) for i in [13, 14, 15, 16]]
-    test_files = [file_path.format(s=i) for i in [17]]
+    val_files = [file_path.format(s=All_files[i])  for i in range(len(All_files)) if i in val_indices]
+    test_files = [file_path.format(s=i) for i in [args.test]]
+    # print(f"Train files: {train_files}\nValid: {val_files}\nTest files: {test_files}")
 
-    print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
+    # print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
     train_loader = torch.utils.data.DataLoader(
@@ -193,53 +198,9 @@ def prepare_WESAD_dataloader(args):
         num_workers=args.num_workers,
         persistent_workers=True,
     )
-    print(f"Size of loader of:\n\tTrain: {len(train_loader)}\n\tVal:   {len(val_loader)}\n\tTest:  {len(test_loader)}")
+    # print(f"Size of loader of:\n\tTrain: {len(train_loader)}\n\tVal:   {len(val_loader)}\n\tTest:  {len(test_loader)}")
     return train_loader, test_loader, val_loader
 
-def prepare_WESAD_dataloader_manual(sampling_rate=200, batch_size=512, num_workers=4):
-    # set random seed
-    seed = 12345
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-
-    root = os.path.abspath(os.curdir) + "/WESAD/"
-    file_path = root + "S{s}/S{s}_n0.pkl"
-    train_files = [file_path.format(s=i)  for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
-    np.random.shuffle(train_files)
-    # train_files = train_files[:100000]
-    val_files = [file_path.format(s=i) for i in [13, 14, 15, 16]]
-    test_files = [file_path.format(s=i) for i in [17]]
-
-    print(f"Len of train: {len(train_files)}, val: {len(val_files)}, test: {len(test_files)}")
-
-    # prepare training and test data loader
-    train_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=train_files, sampling_rate=sampling_rate),
-        batch_size=batch_size,
-        shuffle=True,
-        drop_last=False,
-        num_workers=num_workers,
-        persistent_workers=True,
-        # collate_fn=
-    )
-    test_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=test_files, sampling_rate=sampling_rate),
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        persistent_workers=True,
-    )
-    val_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=val_files, sampling_rate=sampling_rate),
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        persistent_workers=True,
-    )
-    print(f"train size: {len(train_loader)}, val size: {len(val_loader)}, test size: {len(test_loader)}")
-    return train_loader, test_loader, val_loader
 
 
 def prepare_TUAB_dataloader(args):
@@ -378,13 +339,13 @@ def prepare_PTB_dataloader(args):
 
 
 def supervised(args):
-    print("Welcome")
+    # print("Welcome")
     # get data loaders
     if args.dataset == "TUAB":
         train_loader, test_loader, val_loader = prepare_TUAB_dataloader(args)
 
     elif args.dataset == "WESAD":
-        print(f"Dataset: WESAD")
+        # print(f"Dataset: WESAD")
         train_loader, test_loader, val_loader = prepare_WESAD_dataloader(args)
 
     else:
@@ -454,7 +415,7 @@ def supervised(args):
         )
         if args.pretrain_model_path and (args.sampling_rate == 200):
             model.biot.load_state_dict(torch.load(args.pretrain_model_path))
-            print(f"load pretrain model from {args.pretrain_model_path}")
+            # print(f"load pretrain model from {args.pretrain_model_path}")
 
     else:
         raise NotImplementedError
@@ -473,7 +434,7 @@ def supervised(args):
 
     trainer = pl.Trainer(
         devices="auto",
-        accelerator="cpu",
+        accelerator=args.device,
         # strategy=DDPStrategy(find_unused_parameters=False),
         # auto_select_gpus=True,
         benchmark=True,
@@ -493,6 +454,7 @@ def supervised(args):
         model=lightning_model, ckpt_path="best", dataloaders=test_loader
     )[0]
     print(pretrain_result)
+    return pretrain_result
 
 
 if __name__ == "__main__":

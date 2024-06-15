@@ -106,6 +106,7 @@ class BIOTEncoder(nn.Module):
             center = False,
             onesided = True,
             return_complex = True,
+            window=torch.ones(self.n_fft),
         )
         return torch.abs(spectral)
 

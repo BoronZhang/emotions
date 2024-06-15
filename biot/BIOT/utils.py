@@ -24,7 +24,6 @@ class WESADLoader(torch.utils.data.Dataset):
         self.sampling_rate = sampling_rate
         self.common_shape = 3000
         self.window = window_size
-        self.opened_file:tuple[torch.Tensor, torch.Tensor] = (torch.tensor([]), torch.tensor([]))
         self.windows_in_file = self.common_shape // (self.window * self.sampling_rate)
 
     def __len__(self):
@@ -33,46 +32,42 @@ class WESADLoader(torch.utils.data.Dataset):
     def __getitem__(self, index):
         file_index = index // self.windows_in_file
         window_index  = (index % self.windows_in_file) * self.window * self.sampling_rate
-        with open("log.txt", "a") as file:
-            file.write(f"In loader index = {index}, file index = {file_index}, window ind = {window_index}\n")
-        if len(self.opened_file[0]) == 0:
-            with open(self.files[file_index], 'rb') as pklfile:
-                sample = pickle.load(pklfile, encoding='bytes')
-            
-            arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
-            X = np.concatenate(arrays)
-            X = torch.FloatTensor(X)
-            Y = sample['label'].mean(1).astype(np.int64)
-            Y = torch.from_numpy(Y)
-            # from default 200Hz to ?
-            # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
-            
-            # reshaping to a common shape (doesn't have a lot of effect)
-            if X.shape[1] < self.common_shape:
-                adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
-                X = torch.concat((X, adding), dim=1)
-                adding = torch.ones(self.common_shape - Y.shape[0])
-                Y = torch.concat((Y, adding), dim=0)
-            else:
-                X = X[:, :self.common_shape]
-                Y = Y[:self.common_shape]
-            X = X / (
-                torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
-                # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
-                + 1e-8
-            )
-            with open("log.txt", "a") as file:
-                file.write(f"In loader main X = {X.shape}, y = {Y.shape}\n")
-            self.opened_file = (X, Y)
         
+
+        with open(self.files[file_index], 'rb') as pklfile:
+            sample = pickle.load(pklfile, encoding='bytes')
         
-        x = self.opened_file[0][:, window_index:window_index + self.window*self.sampling_rate]
-        y = self.opened_file[1][window_index:window_index + self.window*self.sampling_rate]
-        y = y[0]
+        arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
+        X = np.concatenate(arrays)
+        X = torch.FloatTensor(X)
+        Y = sample['label'].mean(1).astype(np.int64)
+        Y = torch.from_numpy(Y)
+        # from default 200Hz to ?
+        # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
+        
+        # reshaping to a common shape (doesn't have a lot of effect)
+        if X.shape[1] < self.common_shape:
+            adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
+            X = torch.concat((X, adding), dim=1)
+            adding = torch.ones(self.common_shape - Y.shape[0])
+            Y = torch.concat((Y, adding), dim=0)
+        else:
+            X = X[:, :self.common_shape]
+            Y = Y[:self.common_shape]
+        X = X / (
+            torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
+            # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
+            + 1e-8
+        )
+        
+        x = X[:, window_index:window_index + self.window*self.sampling_rate]
+        y = Y[window_index:window_index + self.window*self.sampling_rate]
+        y = y.mode().values.item()
         y = 1 if y == 2 else 0
         y = torch.tensor([y])
         with open("log.txt", "a") as file:
-            file.write(f"In loader, window ind = {(index % self.window)} * {self.window} X = {x.shape}, y = {y.shape}\n")
+            file.write(f"In loader index = {index}, file index = {file_index}, window ind = {window_index}, x = {x.shape}, y = {y.shape}\n")
+        
         return x, y
 
 def collate_fn_WESAD_pretrain(batch):
