@@ -11,7 +11,7 @@ def clean_pkl():
         with open(f"WESAD/S{id}/S{id}.pkl", 'rb') as file:
             data = pickle.load(file, encoding='bytes')
             labels:np.ndarray = data[b'label']
-            signals:np.ndarray = data[b'signal']
+            signals = data[b'signal']
             labels_sec = labels.reshape((-1, 700))
             tmp_data = {device: 
                         {sensor.decode(): 
@@ -20,9 +20,7 @@ def clean_pkl():
                         for device in ['wrist', 'chest']}
             goods = (labels_sec.min(axis=1) > 0) & (labels_sec.max(axis=1) < 5)
             labels_sec_good = labels_sec[goods]
-            tmp_data = {device: {
-                sensor: tmp_data[device][sensor][goods] for sensor in tmp_data[device]
-            } for device in tmp_data}
+            tmp_data = {f"{device}_{sensor}": tmp_data[device][sensor][goods] for device in tmp_data for sensor in tmp_data[device]}
             
         tmp_data['label'] = labels_sec_good
         print(end=f'\rWriting S{id}')
@@ -30,7 +28,7 @@ def clean_pkl():
             pickle.dump(tmp_data, file)
         total[f'S{id}'] = tmp_data
         print(f'\rS{id} Finished ({labels.shape[0] / 700} -> {len(labels_sec_good)} seconds)')
-    with open(f'WESAD/total.pkl', 'wb') as file:
-        pickle.dump(total, file)
+    # with open(f'WESAD/total.pkl', 'wb') as file:
+    #     pickle.dump(total, file)
 
 clean_pkl()
