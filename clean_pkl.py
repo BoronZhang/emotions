@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import torch
 
 def clean_pkl():
     subject_ids = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]
@@ -20,9 +21,9 @@ def clean_pkl():
                         for device in ['wrist', 'chest']}
             goods = (labels_sec.min(axis=1) > 0) & (labels_sec.max(axis=1) < 5)
             labels_sec_good = labels_sec[goods]
-            tmp_data = {f"{device}_{sensor}": tmp_data[device][sensor][goods] for device in tmp_data for sensor in tmp_data[device]}
+            end_data:dict[str, torch.Tensor] = {f"{device}_{sensor}": torch.tensor(tmp_data[device][sensor][goods]) for device in tmp_data for sensor in tmp_data[device]}
             
-        tmp_data['label'] = labels_sec_good
+        end_data['label'] = torch.tensor(labels_sec_good)
         print(end=f'\rWriting S{id}')
         with open(f"WESAD/S{id}/S{id}_n0.pkl", 'wb') as file:
             pickle.dump(tmp_data, file)
