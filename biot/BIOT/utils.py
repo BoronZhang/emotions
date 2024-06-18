@@ -4,44 +4,62 @@ import numpy as np
 import pandas as pd
 import torch.nn.functional as F
 import os
-from scipy.signal import resample
-from scipy.signal import butter, iirnotch, filtfilt
+from scipy.signal import resample, butter, iirnotch, filtfilt, lfilter
 from scipy.interpolate import interp1d
-from scipy.signal import butter, lfilter
 
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, window_size=1, sampling_rate=200):
+    def __init__(self, files, common_shape=12000, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
         """
         Parameters:
         ----
         `files`: list of str
         the path to files
+        `common_shape`:int
+        all files converted to this shape
         `window_size`: int
-        the window size in second, each item size will be (`channels`, `window_size` * `sampling_rate`)
+        the window size in qsecond, each item size will be (`channels`, `window_size` * `sampling_rate`)
+        `step_size`:int
+        the step between windows
+        `sampling_rate`:int
+        the sampling rates would be converted to this
+        `to_seconds`:bool
+        whether to convert from quarter seconds to seconds
         """
         self.files = files
+        self.to_seconds = to_seconds
+
+        self.common_shape = common_shape * sampling_rate
+        self.window = window_size * sampling_rate
         self.sampling_rate = sampling_rate
-        self.common_shape = 3000
-        self.window = window_size
-        self.windows_in_file = self.common_shape // (self.window * self.sampling_rate)
+        self.step_size = step_size * sampling_rate
+        self.windows_in_file = 1 + (self.common_shape - self.window) // self.step_size
+        print(f"windows in file = 1 + ({self.common_shape} - {self.window}) // {self.step_size} = {self.windows_in_file}")
+        print(f"Total of {len(files)} files")
+        try:
+            with open("WESAD_Biot_Xy.pickle", "rb") as file:
+                self.datasets = pickle.load(file)
+        except:
+            print("Creating datasets")
+            self.datasets = {}
+            for i in range(len(files)):
+                self.load_file(i)
+            with open("WESAD_Biot_Xy.pickle", "wb") as file:
+                pickle.dump(self.datasets, file)
 
     def __len__(self):
-        return len(self.files * self.windows_in_file)
+        return len(self.files) * self.windows_in_file
 
-    def __getitem__(self, index):
-        file_index = index // self.windows_in_file
-        window_index  = (index % self.windows_in_file) * self.window * self.sampling_rate
-        
-
+    def load_file(self, file_index:int):
         with open(self.files[file_index], 'rb') as pklfile:
-            sample = pickle.load(pklfile, encoding='bytes')
+            # each sample sensor has the shape of (seconds, channels, frequency)
+            sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
         
-        arrays = [sample[device][sensor].mean((1, 2)).reshape(1, -1) for device in ['wrist', 'chest'] for sensor in sample[device].keys()]
-        X = np.concatenate(arrays)
-        X = torch.FloatTensor(X)
-        Y = sample['label'].mean(1).astype(np.int64)
-        Y = torch.from_numpy(Y)
+        arrays = [torch.tensor(resample(sample[sensor].mean(1), self.sampling_rate, axis=1)).reshape((1, -1)) 
+                  for sensor in sample.keys() 
+                  if sensor in ["wrist_EDA", "wrist_TEMP", "wrist_BVP"]]
+        X = torch.concat(arrays)
+        Y = sample['label'].mode(1).values
         # from default 200Hz to ?
         # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
         
@@ -59,16 +77,30 @@ class WESADLoader(torch.utils.data.Dataset):
             # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
             + 1e-8
         )
+        with open("log.txt", "a") as file:
+            file.write(f"Loading file {file_index}/{len(self.files)}: X = {X.shape}, Y = {Y.shape}\n")
+        self.datasets[file_index] = (X, Y)
         
-        x = X[:, window_index:window_index + self.window*self.sampling_rate]
-        y = Y[window_index:window_index + self.window*self.sampling_rate]
-        y = y.mode().values.item()
+    def __getitem__(self, index):
+        file_index = index // self.windows_in_file
+        window_index  = (index % self.windows_in_file)
+        
+        X, Y = self.datasets[file_index]
+        x = X[:, window_index:window_index + self.window]
+        y = Y[window_index:window_index + self.window]
+        try:
+            y = y.mode().values.item()
+        except:
+            print(f"Y={Y.shape}, win ind = {window_index}, self window = {self.window}")
+            y = y.mode().values.item()
         y = 1 if y == 2 else 0
         y = torch.tensor([y])
+        if self.to_seconds:
+            x = x.reshape((x.shape[0], -1, 4)).mean(2)
         with open("log.txt", "a") as file:
             file.write(f"In loader index = {index}, file index = {file_index}, window ind = {window_index}, x = {x.shape}, y = {y.shape}\n")
         
-        return x, y
+        return x.type(torch.float32), y.type(torch.float32)
 
 def collate_fn_WESAD_pretrain(batch):
     prest_samples, shhs_samples = [], []

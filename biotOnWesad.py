@@ -22,8 +22,14 @@ class Args:
         self.server = "pc" # or colab
         self.test = test
         self.device = "cpu"
+        self.step_size = 40
+        self.window_size = 240
+        self.common_shape = 12000
         
-if __name__ == "__main__":    
+        
+if __name__ == "__main__":
+    with open("log.txt", "w") as file:
+        file.write("")    
     results = {}
     for test in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]:
         print(f"\033[93mTesting {test}\033[0m")

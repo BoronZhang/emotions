@@ -16,16 +16,26 @@ from pytorch_lightning.strategies import DDPStrategy
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pyhealth.metrics import binary_metrics_fn
-
-from .model import (
-    SPaRCNet,
-    ContraWR,
-    CNNTransformer,
-    FFCL,
-    STTransformer,
-    BIOTClassifier,
-)
-from .utils import WESADLoader, TUABLoader, CHBMITLoader, PTBLoader, focal_loss, BCE
+try:
+    from .model import (
+        SPaRCNet,
+        ContraWR,
+        CNNTransformer,
+        FFCL,
+        STTransformer,
+        BIOTClassifier,
+    )
+    from .utils import WESADLoader, TUABLoader, CHBMITLoader, PTBLoader, focal_loss, BCE
+except:
+    from model import (
+        SPaRCNet,
+        ContraWR,
+        CNNTransformer,
+        FFCL,
+        STTransformer,
+        BIOTClassifier,
+    )
+    from utils import WESADLoader, TUABLoader, CHBMITLoader, PTBLoader, focal_loss, BCE
 
 
 class LitModel_finetune(pl.LightningModule):
@@ -123,7 +133,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
+                metrics=["pr_auc", "roc_auc", "accuracy", "balanced_accuracy", "f1"],
                 threshold=self.threshold,
             )
         else:
@@ -176,8 +186,10 @@ def prepare_WESAD_dataloader(args):
     # print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
+    loader_args = {'common_shape': args.common_shape, 'sampling_rate': args.sampling_rate, 
+                   'window_size': args.window_size, 'step_size': args.step_size,}
     train_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=train_files, sampling_rate=args.sampling_rate),
+        WESADLoader(files=train_files, **loader_args),
         batch_size=args.batch_size,
         shuffle=True,
         drop_last=True,
@@ -185,14 +197,14 @@ def prepare_WESAD_dataloader(args):
         persistent_workers=True,
     )
     test_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=test_files, sampling_rate=args.sampling_rate),
+        WESADLoader(files=test_files, **loader_args),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
         persistent_workers=True,
     )
     val_loader = torch.utils.data.DataLoader(
-        WESADLoader(files=val_files, sampling_rate=args.sampling_rate),
+        WESADLoader(files=val_files, **loader_args),
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
