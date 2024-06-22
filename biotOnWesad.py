@@ -1,4 +1,4 @@
-from biot.BIOT.run_binary_supervised import supervised
+from biot.BIOT.run_binary_supervised import Supervised
 from inputimeout import inputimeout, TimeoutOccurred
 import json
 import time
@@ -43,15 +43,15 @@ class Main:
             for key in self.kwargs:
                 if hasattr(args, key):
                     setattr(args, key, self.kwargs[key])
-
-            results[test] = supervised(args)
+            self.model = Supervised(args=args)
+            results[test] = self.model.supervised_go()
             total_time = time.time() - start_time
             results[test]['time'] = total_time
             print(f"\033[92mTotal time: {total_time} secs\033[0m")
             with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
                 json.dump(results, file, indent=2)
             try:
-                go = inputimeout("\033[91mWould you like to continue: \033[0m", 60)
+                go = inputimeout("\033[91mWould you like to continue: \033[0m", 30)
                 print(f"test = {test}")
                 if go in ["cancel", "0", "done", "no", "n"]:
                     break

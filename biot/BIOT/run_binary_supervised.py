@@ -56,12 +56,12 @@ class LitModel_finetune(pl.LightningModule):
 
     def training_step(self, batch:tuple[torch.Tensor, torch.Tensor], batch_idx):
         X, y = batch
-        prob = self.model(X)
-        loss = BCE(prob, y)  # focal_loss(prob, y)
-        # print("In train")
         print(f"\t\033[94mX = {X.shape}\033[0m")
         print(f"\t\033[94my = {y.shape}\033[0m")
+        prob = self.model(X)
         print(f"\t\033[94mProb = {prob.shape}\033[0m")
+        loss = BCE(prob, y)  # focal_loss(prob, y)
+        # print("In train")
         print(f"\t\033[94mLoss = {loss}\033[0m")
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
@@ -101,7 +101,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc", "recall", "accuracy", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
@@ -138,7 +138,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "recall", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
@@ -359,6 +359,7 @@ class Supervised:
     def __init__(self, args) -> None:
         self.args = args
     def supervised_go(self):
+        args = self.args
         # print("Welcome")
         # get data loaders
         if args.dataset == "TUAB":

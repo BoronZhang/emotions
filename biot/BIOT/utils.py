@@ -33,73 +33,61 @@ class WESADLoader(torch.utils.data.Dataset):
         self.window = window_size * sampling_rate
         self.sampling_rate = sampling_rate
         self.step_size = step_size * sampling_rate
-        self.windows_in_file = 1 + (self.common_shape - self.window) // self.step_size
-        print(f"windows in file = 1 + ({self.common_shape} - {self.window}) // {self.step_size} = {self.windows_in_file}")
-        print(f"Total of {len(files)} files")
         try:
             with open("WESAD_Biot_Xy.pickle", "rb") as file:
-                self.datasets = pickle.load(file)
+                self.Xs, self.Ys = pickle.load(file)
         except:
             print("Creating datasets")
-            self.datasets = {}
-            for i in range(len(files)):
-                self.load_file(i)
+            self.load_files()
             with open("WESAD_Biot_Xy.pickle", "wb") as file:
-                pickle.dump(self.datasets, file)
+                pickle.dump((self.Xs, self.Ys), file)
         print(f"Dataset with len of {self.__len__()}")
 
     def __len__(self):
-        return len(self.files) * self.windows_in_file
+        return self.Ys.shape[1] // self.window
 
-    def load_file(self, file_index:int):
-        with open(self.files[file_index], 'rb') as pklfile:
-            # each sample sensor has the shape of (seconds, channels, frequency)
-            sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
-        
-        arrays = [torch.tensor(resample(sample[sensor].mean(1), self.sampling_rate, axis=1)).reshape((1, -1)) 
-                  for sensor in sample.keys() 
-                  if sensor in ["wrist_EDA", "wrist_TEMP", "wrist_BVP"]]
-        X = torch.concat(arrays)
-        Y = sample['label'].mode(1).values
-        # from default 200Hz to ?
-        # X = resample(X, X.shape[-1] * 200 // self.sampling_rate, axis=-1) # resample to 200Hz
-        
-        # reshaping to a common shape (doesn't have a lot of effect)
-        if X.shape[1] < self.common_shape:
-            adding = torch.zeros(X.shape[0], self.common_shape - X.shape[1])
-            X = torch.concat((X, adding), dim=1)
-            adding = torch.ones(self.common_shape - Y.shape[0])
-            Y = torch.concat((Y, adding), dim=0)
-        else:
-            X = X[:, :self.common_shape]
-            Y = Y[:self.common_shape]
-        X = X / (
-            torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
-            # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
-            + 1e-8
-        )
+    def load_files(self):
+        Xs, Ys = [], []
+        for file_index in range(len(self.files)):
+            if file_index == 12: continue
+            with open(self.files[file_index], 'rb') as pklfile:
+                # each sample sensor has the shape of (seconds, channels, frequency)
+                sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
+            
+            arrays = [torch.tensor(resample(sample[sensor].mean(1), self.sampling_rate, axis=1)).reshape((1, -1)) 
+                    for sensor in sample.keys() 
+                    if sensor in ["wrist_EDA", "wrist_TEMP", "wrist_BVP"]]
+            X = torch.concat(arrays)
+            Y = sample['label'].mode(1).values
+            Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1)
+            
+            X = X / (
+                torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
+                # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
+                + 1e-8
+            )
+            with open("log.txt", "a") as file:
+                file.write(f"Init sizes = X: {X.shape}, Y: {Y.shape}\n")
+            Xs.append(X)
+            Ys.append(Y)
+            # with open("log.txt", "a") as file:
+            #     file.write(f"Loading file {file_index}/{len(self.files)}: X = {X.shape}, Y = {Y.shape}\n")
+            # self.datasets[file_index] = (X, Y)
+        self.Xs = torch.concat(Xs, dim=1)
+        self.Ys = torch.concat(Ys, dim=1)
         with open("log.txt", "a") as file:
-            file.write(f"Loading file {file_index}/{len(self.files)}: X = {X.shape}, Y = {Y.shape}\n")
-        self.datasets[file_index] = (X, Y)
+            file.write(f"Loaded: Xs: {self.Xs.shape}, Ys: {self.Ys.shape}")
+        
+
         
     def __getitem__(self, index):
-        file_index = index // self.windows_in_file
-        window_index  = (index % self.windows_in_file)
-        
-        X, Y = self.datasets[file_index]
-        x = X[:, window_index:window_index + self.window]
-        y = Y[window_index:window_index + self.window]
-        try:
-            y = y.mode().values.item()
-        except:
-            print(f"Y={Y.shape}, win ind = {window_index}, self window = {self.window}")
-            y = y.mode().values.item()
+        x = self.Xs[:, index:index + self.window]
+        y = self.Ys[:, index:index + self.window]
+        y = y.mode().values.item()
         y = 1 if y == 2 else 0
         y = torch.tensor([y])
         if self.to_seconds:
             x = x.reshape((x.shape[0], -1, 4)).mean(2)
-        with open("log.txt", "a") as file:
-            file.write(f"In loader index = {index}, file index = {file_index}, window ind = {window_index}, x = {x.shape}, y = {y.shape}\n")
         
         return x.type(torch.float32), y.type(torch.float32)
 
