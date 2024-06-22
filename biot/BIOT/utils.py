@@ -46,6 +46,7 @@ class WESADLoader(torch.utils.data.Dataset):
                 self.load_file(i)
             with open("WESAD_Biot_Xy.pickle", "wb") as file:
                 pickle.dump(self.datasets, file)
+        print(f"Dataset with len of {self.__len__()}")
 
     def __len__(self):
         return len(self.files) * self.windows_in_file

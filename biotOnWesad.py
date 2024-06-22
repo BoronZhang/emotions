@@ -8,7 +8,7 @@ class Args:
         self.epochs = 50
         self.lr = 1e-3
         self.weight_decay = 1e-5
-        self.batch_size = 4
+        self.batch_size = 64
         self.num_workers = 4
         self.dataset = "WESAD"
         self.model = "BIOT"
@@ -22,33 +22,45 @@ class Args:
         self.server = "pc" # or colab
         self.test = test
         self.device = "cpu"
-        self.step_size = 40
+        self.step_size = 240
         self.window_size = 240
         self.common_shape = 12000
-        
-        
-if __name__ == "__main__":
-    with open("log.txt", "w") as file:
-        file.write("")    
-    results = {}
-    for test in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17]:
-        print(f"\033[93mTesting {test}\033[0m")
-        start_time = time.time()
-        args = Args(test=test)
-        results[test] = supervised(args)
-        total_time = time.time() - start_time
-        results[test]['time'] = total_time
-        print(f"\033[92mTotal time: {total_time} secs\033[0m")
-        with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
-            json.dump(results, file, indent=2)
-        try:
-            go = inputimeout("\033[91mWould you like to continue: \033[0m", 60)
-            print(f"test = {test}")
-            if go in ["cancel", "0", "done", "no", "n"]:
+
+class Main:
+    def __init__(self, tests=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17], **kwargs) -> None:
+        self.tests = tests
+        self.kwargs = kwargs
+
+    def go(self):
+        with open("log.txt", "w") as file:
+            file.write("")    
+        results = {}
+        for test in self.tests:
+            print(f"\033[93mTesting {test}\033[0m")
+            start_time = time.time()
+            args = Args(test=test)
+
+            for key in self.kwargs:
+                if hasattr(args, key):
+                    setattr(args, key, self.kwargs[key])
+
+            results[test] = supervised(args)
+            total_time = time.time() - start_time
+            results[test]['time'] = total_time
+            print(f"\033[92mTotal time: {total_time} secs\033[0m")
+            with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
+                json.dump(results, file, indent=2)
+            try:
+                go = inputimeout("\033[91mWould you like to continue: \033[0m", 60)
+                print(f"test = {test}")
+                if go in ["cancel", "0", "done", "no", "n"]:
+                    break
+            except TimeoutOccurred:
+                pass
+            except KeyboardInterrupt:
                 break
-        except TimeoutOccurred:
-            pass
-        except KeyboardInterrupt:
-            break
     
-        
+    
+if __name__ == "__main__":
+    runner = Main()
+    runner.go()

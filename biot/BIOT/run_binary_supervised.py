@@ -54,21 +54,25 @@ class LitModel_finetune(pl.LightningModule):
         self.log("training_epoch_average", epoch_average)
         self.train_step_outputs.clear()  # free memory
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch:tuple[torch.Tensor, torch.Tensor], batch_idx):
         X, y = batch
         prob = self.model(X)
         loss = BCE(prob, y)  # focal_loss(prob, y)
         # print("In train")
-        # print(f"\t\033[94mX = {X.shape}\033[0m")
-        # print(f"\t\033[94my = {y.shape}\033[0m")
-        # print(f"\t\033[94mProb = {prob.shape}\033[0m")
-        # print(f"\t\033[94mLoss = {loss.shape}\033[0m")
+        print(f"\t\033[94mX = {X.shape}\033[0m")
+        print(f"\t\033[94my = {y.shape}\033[0m")
+        print(f"\t\033[94mProb = {prob.shape}\033[0m")
+        print(f"\t\033[94mLoss = {loss}\033[0m")
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
         return loss
 
     def validation_step(self, batch, batch_idx):
         X, y = batch
+        if y.sum() == 0: # handling all 0 or all 1
+            y[random.choice(range(len(y)))] = 1
+        elif y.sum() == len(y):
+            y[random.choice(range(len(y)))] = 0
         # print(f"\n\033[94mX = {X.shape}\033[0m")
         # print(f"\n\033[94my = {y.shape}\033[0m")
         with torch.no_grad():
@@ -86,8 +90,9 @@ class LitModel_finetune(pl.LightningModule):
         for out in self.val_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
-        # print(f"\n\033[94mResult: {result}\033[0m")
-        # print(f"\n\033[94mgt = {gt}\033[0m")
+        print(f"\n\033[94mResult:\n{result.shape}\033[0m")
+        
+        print(f"\n\033[94mgt =\n{gt.shape}\033[0m")
         
         if (
             sum(gt) * (len(gt) - sum(gt)) != 0
@@ -96,7 +101,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
@@ -133,7 +138,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["pr_auc", "roc_auc", "accuracy", "balanced_accuracy", "f1"],
+                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
@@ -350,123 +355,126 @@ def prepare_PTB_dataloader(args):
     return train_loader, test_loader, val_loader
 
 
-def supervised(args):
-    # print("Welcome")
-    # get data loaders
-    if args.dataset == "TUAB":
-        train_loader, test_loader, val_loader = prepare_TUAB_dataloader(args)
+class Supervised:
+    def __init__(self, args) -> None:
+        self.args = args
+    def supervised_go(self):
+        # print("Welcome")
+        # get data loaders
+        if args.dataset == "TUAB":
+            train_loader, test_loader, val_loader = prepare_TUAB_dataloader(args)
 
-    elif args.dataset == "WESAD":
-        # print(f"Dataset: WESAD")
-        train_loader, test_loader, val_loader = prepare_WESAD_dataloader(args)
+        elif args.dataset == "WESAD":
+            # print(f"Dataset: WESAD")
+            train_loader, test_loader, val_loader = prepare_WESAD_dataloader(args)
 
-    else:
-        raise NotImplementedError
+        else:
+            raise NotImplementedError
 
-    # define the model
-    if args.model == "SPaRCNet":
-        model = SPaRCNet(
-            in_channels=args.in_channels,
-            sample_length=int(args.sampling_rate * args.sample_length),
-            n_classes=args.n_classes,
-            block_layers=4,
-            growth_rate=16,
-            bn_size=16,
-            drop_rate=0.5,
-            conv_bias=True,
-            batch_norm=True,
+        # define the model
+        if args.model == "SPaRCNet":
+            model = SPaRCNet(
+                in_channels=args.in_channels,
+                sample_length=int(args.sampling_rate * args.sample_length),
+                n_classes=args.n_classes,
+                block_layers=4,
+                growth_rate=16,
+                bn_size=16,
+                drop_rate=0.5,
+                conv_bias=True,
+                batch_norm=True,
+            )
+
+        elif args.model == "ContraWR":
+            model = ContraWR(
+                in_channels=args.in_channels,
+                n_classes=args.n_classes,
+                fft=args.token_size,
+                steps=args.hop_length // 5,
+            )
+
+        elif args.model == "CNNTransformer":
+            model = CNNTransformer(
+                in_channels=args.in_channels,
+                n_classes=args.n_classes,
+                fft=args.sampling_rate,
+                steps=args.hop_length // 5,
+                dropout=0.2,
+                nhead=4,
+                emb_size=256,
+            )
+
+        elif args.model == "FFCL":
+            model = FFCL(
+                in_channels=args.in_channels,
+                n_classes=args.n_classes,
+                fft=args.token_size,
+                steps=args.hop_length // 5,
+                sample_length=int(args.sampling_rate * args.sample_length),
+                shrink_steps=20,
+            )
+
+        elif args.model == "STTransformer":
+            model = STTransformer(
+                emb_size=256,
+                depth=4,
+                n_classes=args.n_classes,
+                channel_legnth=int(
+                    args.sampling_rate * args.sample_length
+                ),  # (sampling_rate * duration)
+                n_channels=args.in_channels,
+            )
+
+        elif args.model == "BIOT":
+            model = BIOTClassifier(
+                n_classes=args.n_classes,
+                # set the n_channels according to the pretrained model if necessary
+                n_channels=args.in_channels,
+                n_fft=args.token_size,
+                hop_length=args.hop_length,
+            )
+            if args.pretrain_model_path and (args.sampling_rate == 200):
+                model.biot.load_state_dict(torch.load(args.pretrain_model_path))
+                # print(f"load pretrain model from {args.pretrain_model_path}")
+
+        else:
+            raise NotImplementedError
+        self.lightning_model = LitModel_finetune(args, model)
+
+        # logger and callbacks
+        version = f"{args.dataset}-{args.model}-{args.lr}-{args.batch_size}-{args.sampling_rate}-{args.token_size}-{args.hop_length}"
+        logger = TensorBoardLogger(
+            save_dir="./",
+            version=version,
+            name="log",
+        )
+        early_stop_callback = EarlyStopping(
+            monitor="val_auroc", patience=5, verbose=False, mode="max"
         )
 
-    elif args.model == "ContraWR":
-        model = ContraWR(
-            in_channels=args.in_channels,
-            n_classes=args.n_classes,
-            fft=args.token_size,
-            steps=args.hop_length // 5,
+        trainer = pl.Trainer(
+            devices="auto",
+            accelerator=args.device,
+            # strategy=DDPStrategy(find_unused_parameters=False),
+            # auto_select_gpus=True,
+            benchmark=True,
+            enable_checkpointing=True,
+            logger=logger,
+            max_epochs=args.epochs,
+            callbacks=[early_stop_callback],
         )
 
-    elif args.model == "CNNTransformer":
-        model = CNNTransformer(
-            in_channels=args.in_channels,
-            n_classes=args.n_classes,
-            fft=args.sampling_rate,
-            steps=args.hop_length // 5,
-            dropout=0.2,
-            nhead=4,
-            emb_size=256,
+        # train the model
+        trainer.fit(
+            self.lightning_model, train_dataloaders=train_loader, val_dataloaders=val_loader
         )
 
-    elif args.model == "FFCL":
-        model = FFCL(
-            in_channels=args.in_channels,
-            n_classes=args.n_classes,
-            fft=args.token_size,
-            steps=args.hop_length // 5,
-            sample_length=int(args.sampling_rate * args.sample_length),
-            shrink_steps=20,
-        )
-
-    elif args.model == "STTransformer":
-        model = STTransformer(
-            emb_size=256,
-            depth=4,
-            n_classes=args.n_classes,
-            channel_legnth=int(
-                args.sampling_rate * args.sample_length
-            ),  # (sampling_rate * duration)
-            n_channels=args.in_channels,
-        )
-
-    elif args.model == "BIOT":
-        model = BIOTClassifier(
-            n_classes=args.n_classes,
-            # set the n_channels according to the pretrained model if necessary
-            n_channels=args.in_channels,
-            n_fft=args.token_size,
-            hop_length=args.hop_length,
-        )
-        if args.pretrain_model_path and (args.sampling_rate == 200):
-            model.biot.load_state_dict(torch.load(args.pretrain_model_path))
-            # print(f"load pretrain model from {args.pretrain_model_path}")
-
-    else:
-        raise NotImplementedError
-    lightning_model = LitModel_finetune(args, model)
-
-    # logger and callbacks
-    version = f"{args.dataset}-{args.model}-{args.lr}-{args.batch_size}-{args.sampling_rate}-{args.token_size}-{args.hop_length}"
-    logger = TensorBoardLogger(
-        save_dir="./",
-        version=version,
-        name="log",
-    )
-    early_stop_callback = EarlyStopping(
-        monitor="val_auroc", patience=5, verbose=False, mode="max"
-    )
-
-    trainer = pl.Trainer(
-        devices="auto",
-        accelerator=args.device,
-        # strategy=DDPStrategy(find_unused_parameters=False),
-        # auto_select_gpus=True,
-        benchmark=True,
-        enable_checkpointing=True,
-        logger=logger,
-        max_epochs=args.epochs,
-        callbacks=[early_stop_callback],
-    )
-
-    # train the model
-    trainer.fit(
-        lightning_model, train_dataloaders=train_loader, val_dataloaders=val_loader
-    )
-
-    # test the model
-    pretrain_result = trainer.test(
-        model=lightning_model, ckpt_path="best", dataloaders=test_loader
-    )[0]
-    print(pretrain_result)
-    return pretrain_result
+        # test the model
+        pretrain_result = trainer.test(
+            model=self.lightning_model, ckpt_path="best", dataloaders=test_loader
+        )[0]
+        print(pretrain_result)
+        return pretrain_result
 
 
 if __name__ == "__main__":
