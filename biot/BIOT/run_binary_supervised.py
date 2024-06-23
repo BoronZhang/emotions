@@ -56,13 +56,13 @@ class LitModel_finetune(pl.LightningModule):
 
     def training_step(self, batch:tuple[torch.Tensor, torch.Tensor], batch_idx):
         X, y = batch
-        print(f"\t\033[94mX = {X.shape}\033[0m")
-        print(f"\t\033[94my = {y.shape}\033[0m")
+        # print(f"\t\033[94mX = {X.shape}\033[0m")
+        # print(f"\t\033[94my = {y.shape}\033[0m")
         prob = self.model(X)
-        print(f"\t\033[94mProb = {prob.shape}\033[0m")
+        # print(f"\t\033[94mProb = {prob.shape}\033[0m")
         loss = BCE(prob, y)  # focal_loss(prob, y)
         # print("In train")
-        print(f"\t\033[94mLoss = {loss}\033[0m")
+        # print(f"\t\033[94mLoss = {loss}\033[0m")
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
         return loss
@@ -73,6 +73,8 @@ class LitModel_finetune(pl.LightningModule):
             y[random.choice(range(len(y)))] = 1
         elif y.sum() == len(y):
             y[random.choice(range(len(y)))] = 0
+        # else:
+            # print(f"\n\033[93mWWhhooww\033[0m")
         # print(f"\n\033[94mX = {X.shape}\033[0m")
         # print(f"\n\033[94my = {y.shape}\033[0m")
         with torch.no_grad():
@@ -90,9 +92,9 @@ class LitModel_finetune(pl.LightningModule):
         for out in self.val_step_outputs:
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
-        print(f"\n\033[94mResult:\n{result.shape}\033[0m")
+        # print(f"\n\033[94mResult:\n{result}: {result.shape}\033[0m")
         
-        print(f"\n\033[94mgt =\n{gt.shape}\033[0m")
+        # print(f"\n\033[94mgt =\n{gt}: {result.shape}\033[0m")
         
         if (
             sum(gt) * (len(gt) - sum(gt)) != 0
@@ -101,17 +103,23 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["f1", "pr_auc", "roc_auc", "recall", "accuracy", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc", "recall", "precision", "accuracy", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
             result = {
+                "f1": 0.0,
                 "accuracy": 0.0,
+                "recall": 0.0,
+                "precision": 0.0,
                 "balanced_accuracy": 0.0,
                 "pr_auc": 0.0,
                 "roc_auc": 0.0,
             }
+        self.log("val_f1", result["f1"], sync_dist=True)
         self.log("val_acc", result["accuracy"], sync_dist=True)
+        self.log("val_rec", result["recall"], sync_dist=True)
+        self.log("val_prc", result["precision"], sync_dist=True)
         self.log("val_bacc", result["balanced_accuracy"], sync_dist=True)
         self.log("val_pr_auc", result["pr_auc"], sync_dist=True)
         self.log("val_auroc", result["roc_auc"], sync_dist=True)
@@ -119,6 +127,10 @@ class LitModel_finetune(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         X, y = batch
+        if y.sum() == 0: # handling all 0 or all 1
+            y[random.choice(range(len(y)))] = 1
+        elif y.sum() == len(y):
+            y[random.choice(range(len(y)))] = 0
         with torch.no_grad():
             convScore = self.model(X)
             step_result = torch.sigmoid(convScore).cpu().numpy()
@@ -138,17 +150,23 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["f1", "pr_auc", "roc_auc", "accuracy", "recall", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc". "precision", "accuracy", "recall", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
             result = {
+                "f1": 0.0,
                 "accuracy": 0.0,
+                "recall": 0.0,
+                "precision": 0.0,
                 "balanced_accuracy": 0.0,
                 "pr_auc": 0.0,
                 "roc_auc": 0.0,
             }
+        self.log("test_f1", result["f1"], sync_dist=True)
         self.log("test_acc", result["accuracy"], sync_dist=True)
+        self.log("test_rec", result["recall"], sync_dist=True)
+        self.log("test_prc", result["precision"], sync_dist=True)
         self.log("test_bacc", result["balanced_accuracy"], sync_dist=True)
         self.log("test_pr_auc", result["pr_auc"], sync_dist=True)
         self.log("test_auroc", result["roc_auc"], sync_dist=True)
@@ -191,8 +209,7 @@ def prepare_WESAD_dataloader(args):
     # print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
-    loader_args = {'common_shape': args.common_shape, 'sampling_rate': args.sampling_rate, 
-                   'window_size': args.window_size, 'step_size': args.step_size,}
+    loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size,}
     train_loader = torch.utils.data.DataLoader(
         WESADLoader(files=train_files, **loader_args),
         batch_size=args.batch_size,

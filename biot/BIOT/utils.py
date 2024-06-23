@@ -9,14 +9,12 @@ from scipy.interpolate import interp1d
 
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, common_shape=12000, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
+    def __init__(self, files, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
         """
         Parameters:
         ----
         `files`: list of str
         the path to files
-        `common_shape`:int
-        all files converted to this shape
         `window_size`: int
         the window size in qsecond, each item size will be (`channels`, `window_size` * `sampling_rate`)
         `step_size`:int
@@ -29,18 +27,12 @@ class WESADLoader(torch.utils.data.Dataset):
         self.files = files
         self.to_seconds = to_seconds
 
-        self.common_shape = common_shape * sampling_rate
         self.window = window_size * sampling_rate
         self.sampling_rate = sampling_rate
         self.step_size = step_size * sampling_rate
-        try:
-            with open("WESAD_Biot_Xy.pickle", "rb") as file:
-                self.Xs, self.Ys = pickle.load(file)
-        except:
-            print("Creating datasets")
-            self.load_files()
-            with open("WESAD_Biot_Xy.pickle", "wb") as file:
-                pickle.dump((self.Xs, self.Ys), file)
+        self.load_files()
+        with open("WESAD_Biot_Xy.pickle", "wb") as file:
+            pickle.dump((self.Xs, self.Ys), file)
         print(f"Dataset with len of {self.__len__()}")
 
     def __len__(self):
@@ -49,7 +41,6 @@ class WESADLoader(torch.utils.data.Dataset):
     def load_files(self):
         Xs, Ys = [], []
         for file_index in range(len(self.files)):
-            if file_index == 12: continue
             with open(self.files[file_index], 'rb') as pklfile:
                 # each sample sensor has the shape of (seconds, channels, frequency)
                 sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
@@ -81,6 +72,7 @@ class WESADLoader(torch.utils.data.Dataset):
 
         
     def __getitem__(self, index):
+        index *= self.window
         x = self.Xs[:, index:index + self.window]
         y = self.Ys[:, index:index + self.window]
         y = y.mode().values.item()

@@ -24,8 +24,7 @@ class Args:
         self.device = "cpu"
         self.step_size = 240
         self.window_size = 240
-        self.common_shape = 12000
-
+        
 class Main:
     def __init__(self, tests=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17], **kwargs) -> None:
         self.tests = tests
