@@ -3,6 +3,7 @@
 \usepackage{graphicx}
 \usepackage[colorlinks=true, linkcolor=black, citecolor=cyan, urlcolor=darkgray]{hyperref}
 \usepackage{dirtree}
+\usepackage{hyperref}
 \usepackage{tikz}
 \usetikzlibrary{automata, positioning, arrows}
 
@@ -16,7 +17,7 @@
 	\maketitle
 	\newpage
 	\begin{abstract}
-		تشخیص عواطف
+		تشخیص عواطف یکی از کاربردهای روزافزون هوش مصنوعی است. این کار می‌تواند در صنعت روانشناسی و خصوصا حوزه ترکیبی محاسبات عاطفی نقش بسیار پررنگی ایفا کند. همچنین هر روز پیشرفت بیشتری را در مورد پوشیدنی‌های هوشمند و افزایش استفاده از آنها را شاهد هستیم.
 	\end{abstract}
 	\newpage
 	\tableofcontents
@@ -112,15 +113,45 @@
 			17 &3002\\
 			\hline
 		\end{tabular}
-		\label{table:classes}
+		\label{classes}
 		\caption{ثانیه‌های مفید هر یک از سوژه‌ها}
 	\end{table}
-	در جدول\ref{table:classes} ثانیه های مفید هر یک از سوژه‌ها آورده شده است. منظور از ثانیه‌های مفید، آنهایی است که کلاس های آنها حالت پایه، استرس، خوشحالی و یا آرامش است. در دادگان دو کلاس بی‌نام دیگر وجود دارد که آنها میباست حذف شوند.
+	در جدول\ref{classes} ثانیه های مفید هر یک از سوژه‌ها آورده شده است. منظور از ثانیه‌های مفید، آنهایی است که کلاس های آنها حالت پایه، استرس، خوشحالی و یا آرامش است. در دادگان دو کلاس بی‌نام دیگر وجود دارد که آنها میباست حذف شوند.
 	
-	ﻛﻼﺱگﺬﺍﺭﻱ ﺩﺭ ﺑﻴﺸﺘﺮﻳﻦ ﻓﺮﻛﺎﻧﺲ ﻣﻤﻜﻦ (۷۰۰) ﺻﻮﺭﺕ گﺮﻓﺘﻪ ﻭ ﺑﺮﺍﻱ ﻫﺮ ﻳﻚ ﺍﺯ ﺳﻨﺴﻮﺭﻫﺎ ﺑﺮﺍﻱ ﺩﺳﺘﻴﺎﺑﻲ ﺑﻪ ﻛﻼﺱ ﻣﻮﺭﺩﻧﻈﺮ ﺑﺎﻳﺪ ﺁﻥ ﺭﺍ ﺑﻪ ﻓﺮﻛﺎﻧﺲ ﺁﻥ ﺳﻨﺴﻮﺭ ﺗﺒﺪﻳﻞ ﻛﻨﻴﻢ.
+	ﻛﻼﺱگذﺍﺭﻱ ﺩﺭ ﺑﻴﺸﺘﺮﻳﻦ ﻓﺮﻛﺎﻧﺲ ﻣﻤﻜﻦ (۷۰۰) ﺻﻮﺭﺕ گرﻓﺘﻪ ﻭ ﺑﺮﺍﻱ ﻫﺮ ﻳﻚ ﺍﺯ ﺳﻨﺴﻮﺭﻫﺎ ﺑﺮﺍﻱ ﺩﺳﺘﻴﺎﺑﻲ ﺑﻪ ﻛﻼﺱ ﻣﻮﺭﺩﻧﻈﺮ ﺑﺎﻳﺪ ﺁﻥ ﺭﺍ ﺑﻪ ﻓﺮﻛﺎﻧﺲ ﺁﻥ ﺳﻨﺴﻮﺭ ﺗﺒﺪﻳﻞ ﻛﻨﻴﻢ.
 	
 	
+	\section{کارهای مشابه}
+	کارهای زیادی با استفاده از این مجموعه داده برای تشخیص عواطف صورت گرفته است. گرجه این دادگان در 4 کلاس گردآوری شده، بیشتر کارها 2کلاسه یا 3کلاسه (حالت عادی، استرس و خوشحالی) هستند. همچنین از پرسشنامه‌های موجود در دادگان بهره جندانی برده نشده‌است.
 	
+	
+	در جدول \ref*{related} کارهای مشابه که از این دادگان استفاده کردند آورده شده‌است. 
+	\begin{table}[h]
+		\begin{tabular}{|p{0.35\linewidth}|p{0.25\linewidth}|p{0.2\linewidth}|p{0.2\linewidth}|}
+			\hline
+			نام کار & سیگنال‌ها & پنجره & عملکرد \english{f-1}\\
+			\hline
+			\english{Introducing WESAD, a Multimodal Dataset for Wearable
+				Stress and Affect Detection} & \english{Extracted features from all the signals} &  پنجره : 60 ثانیه، قدم:  $\text{1}/\text{4}$ ثانیه  & \english{2class: 91.47, 3class: 72.51}\\
+			\hline
+			\english{Transformer-based Self-supervised Multimodal
+				Representation Learning for Wearable Emotion
+				Recognition} & \english{Wrist BVP, EDA, and Temp} & پنجره : 60  ثانیه (4 هرتز)، قدم:  $\text{1}/\text{4}$ ثانیه & 
+				\english{2class: 93.69, 3class: 82.01}\\
+			\hline
+			\english{Stress Detection with Machine Learning and Deep
+				Learning using Multimodal Physiological Data} & \english{Manual features from all the signals} &‌ پنجره: 1 ثانیه‌، قدم: 1 ثانیه & \english{2class: 94.24, 3class: 78.71}\\
+			\hline
+			\english{Stress Detection by Machine Learning and Wearable Sensors} &‌ \english{Manual features from all the chest signals} &
+			 پنجره: 10 ثانیه، قدم: 10 ثانیه & \english{2class: 83.34, 3class: 65.73}\\
+			\hline
+			\english{A Transformer Architecture for Stress Detection from ECG} & \english{ECG} & پنجره: 30 ثانیه‌، قدم: 1 ثانیه &‌ \english{2class: 83.3}\\
+			
+			\hline
+		\end{tabular}
+		\label{related}
+		\caption{کارهای مشابه بر روی دادگان \english{WESAD}}
+	\end{table}
 	\section{پیش‌پردازش}
 	در بخش‌های پیش‌رو در مورد کارهای مورد نیاز برای آماده‌سازی داده‌ها برای آموزش مدل‌ها بحث می‌کنیم
 	

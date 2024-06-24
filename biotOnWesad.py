@@ -24,6 +24,18 @@ class Args:
         self.device = "cpu"
         self.step_size = 240
         self.window_size = 240
+        self.sensors = [
+            'wrist_ACC',
+            'wrist_BVP',
+            'wrist_EDA',
+            'wrist_TEMP',
+            'chest_ACC',
+            'chest_ECG',
+            'chest_EMG',
+            'chest_EDA',
+            'chest_Temp',
+            'chest_Resp',
+        ]
         
 class Main:
     def __init__(self, tests=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17], **kwargs) -> None:
@@ -47,6 +59,13 @@ class Main:
             total_time = time.time() - start_time
             results[test]['time'] = total_time
             print(f"\033[92mTotal time: {total_time} secs\033[0m")
+            # cal total
+            mean_results = {
+                metric: sum([results[subj][metric] for subj in results.keys()]) / (len(results.keys()) if 'total' not in results else len(results.keys()) - 1)
+                for metric in results[list(results.keys())[0]]
+            }
+            results["total"] = mean_results
+            
             with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
                 json.dump(results, file, indent=2)
             try:

@@ -150,7 +150,7 @@ class LitModel_finetune(pl.LightningModule):
             result = binary_metrics_fn(
                 gt,
                 result,
-                metrics=["f1", "pr_auc", "roc_auc". "precision", "accuracy", "recall", "balanced_accuracy"],
+                metrics=["f1", "pr_auc", "roc_auc", "precision", "accuracy", "recall", "balanced_accuracy"],
                 threshold=self.threshold,
             )
         else:
@@ -209,7 +209,7 @@ def prepare_WESAD_dataloader(args):
     # print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
-    loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size,}
+    loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size, "sensors": args.sensors}
     train_loader = torch.utils.data.DataLoader(
         WESADLoader(files=train_files, **loader_args),
         batch_size=args.batch_size,

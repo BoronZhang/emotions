@@ -9,7 +9,7 @@ from scipy.interpolate import interp1d
 
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
+    def __init__(self, files, sensors, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
         """
         Parameters:
         ----
@@ -25,6 +25,7 @@ class WESADLoader(torch.utils.data.Dataset):
         whether to convert from quarter seconds to seconds
         """
         self.files = files
+        self.sensors = sensors
         self.to_seconds = to_seconds
 
         self.window = window_size * sampling_rate
@@ -47,7 +48,7 @@ class WESADLoader(torch.utils.data.Dataset):
             
             arrays = [torch.tensor(resample(sample[sensor].mean(1), self.sampling_rate, axis=1)).reshape((1, -1)) 
                     for sensor in sample.keys() 
-                    if sensor in ["wrist_EDA", "wrist_TEMP", "wrist_BVP"]]
+                    if sensor in self.sensors]
             X = torch.concat(arrays)
             Y = sample['label'].mode(1).values
             Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1)
