@@ -37,7 +37,7 @@ class WESADLoader(torch.utils.data.Dataset):
         print(f"Dataset with len of {self.__len__()}")
 
     def __len__(self):
-        return self.Ys.shape[1] // self.window
+        return 1 + (self.Ys.shape[1] - self.window) // self.step_size
 
     def load_files(self):
         Xs, Ys = [], []
@@ -73,8 +73,10 @@ class WESADLoader(torch.utils.data.Dataset):
 
         
     def __getitem__(self, index):
-        index *= self.window
+        index *= self.step_size
         x = self.Xs[:, index:index + self.window]
+        with open("log.txt", "a") as file:
+            file.write(f"___get item = x: {x.shape}, i = {index}, w = {self.window}\n")
         y = self.Ys[:, index:index + self.window]
         y = y.mode().values.item()
         y = 1 if y == 2 else 0
