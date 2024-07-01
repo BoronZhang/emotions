@@ -50,8 +50,9 @@ class WESADLoader(torch.utils.data.Dataset):
                     for sensor in sample.keys() 
                     if sensor in self.sensors]
             X = torch.concat(arrays)
-            Y = sample['label'].mode(1).values
-            Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1)
+            # Y = sample['label'].mode(1).values
+            Y = sample['label'] # in new version label is for each qsecond
+            Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1) # to 200 sampling rate
             
             X = X / (
                 torch.quantile(torch.abs(X), q=0.95, keepdim=True, dim=-1, interpolation="linear")
@@ -68,7 +69,7 @@ class WESADLoader(torch.utils.data.Dataset):
         self.Xs = torch.concat(Xs, dim=1)
         self.Ys = torch.concat(Ys, dim=1)
         with open("log.txt", "a") as file:
-            file.write(f"Loaded: Xs: {self.Xs.shape}, Ys: {self.Ys.shape}")
+            file.write(f"Loaded: Xs: {self.Xs.shape}, Ys: {self.Ys.shape}: (0s: {(self.Ys == 2).sum()}, 1s: {(self.Ys != 2).sum()})\n")
         
 
         

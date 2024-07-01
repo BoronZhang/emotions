@@ -190,6 +190,7 @@ def prepare_WESAD_dataloader(args):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
+    random.seed(seed)
 
     root = os.path.abspath(os.curdir) + "/WESAD/"
     if args.server == "pc":
@@ -210,6 +211,9 @@ def prepare_WESAD_dataloader(args):
 
     # prepare training and test data loader
     loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size, "sensors": args.sensors}
+    print(f"Experiment with sensors:\n")
+    for s in args.sensors:
+        print(f"\t- {s}")
     train_loader = torch.utils.data.DataLoader(
         WESADLoader(files=train_files, **loader_args),
         batch_size=args.batch_size,
@@ -466,6 +470,13 @@ class Supervised:
             version=version,
             name="log",
         )
+        checkpoint_callback = ModelCheckpoint(
+            monitor="val_auroc",
+            dirpath="./checkpoints",
+            filename=f"{version}" + "-{epoch:02d}-{val_auroc:.2f}",
+            save_top_k=1,
+            mode="max",
+        )
         early_stop_callback = EarlyStopping(
             monitor="val_auroc", patience=5, verbose=False, mode="max"
         )
@@ -479,12 +490,12 @@ class Supervised:
             enable_checkpointing=True,
             logger=logger,
             max_epochs=args.epochs,
-            callbacks=[early_stop_callback],
+            callbacks=[early_stop_callback, checkpoint_callback],
         )
 
         # train the model
         trainer.fit(
-            self.lightning_model, train_dataloaders=train_loader, val_dataloaders=val_loader
+            self.lightning_model, train_dataloaders=train_loader, val_dataloaders=val_loader,
         )
 
         # test the model
