@@ -7,14 +7,20 @@ import os
 from scipy.signal import resample, butter, iirnotch, filtfilt, lfilter
 from scipy.interpolate import interp1d
 
+from typing import Literal
 
 class WESADLoader(torch.utils.data.Dataset):
-    def __init__(self, files, sensors, window_size=1, step_size=1, sampling_rate=200, to_seconds=True):
+    def __init__(self, files, sensors, n_classes=2, window_size=1, step_size=1, sampling_rate=200, to_seconds=True, 
+                 imbalance_dels=0, feat_meth:Literal['resample', 'pca', 'autoencoder']="resample"):
         """
         Parameters:
         ----
         `files`: list of str
         the path to files
+        `sensors`:
+        the list of sensors
+        `n_classes`: 
+        number of classes: 2 or 3
         `window_size`: int
         the window size in qsecond, each item size will be (`channels`, `window_size` * `sampling_rate`)
         `step_size`:int
@@ -23,21 +29,38 @@ class WESADLoader(torch.utils.data.Dataset):
         the sampling rates would be converted to this
         `to_seconds`:bool
         whether to convert from quarter seconds to seconds
+        `feat_meth`: str
+        The method to convert features. Used to convert to 200 sampling rate
         """
         self.files = files
         self.sensors = sensors
         self.to_seconds = to_seconds
-
+        self.imbalance_dels = imbalance_dels
+        self.n_classes = n_classes
+        
         self.window = window_size * sampling_rate
         self.sampling_rate = sampling_rate
         self.step_size = step_size * sampling_rate
+
+        if feat_meth == 'resample':
+            self.change_freq = self._resample
+        elif feat_meth == 'pca':
+            pass
+        elif feat_meth == 'autoencoder':
+            pass
+        else:
+            raise AttributeError(f"The `feat_meth` {feat_meth} is not defined")
+        
         self.load_files()
-        with open("WESAD_Biot_Xy.pickle", "wb") as file:
-            pickle.dump((self.Xs, self.Ys), file)
+        # with open("WESAD_Biot_Xy.pickle", "wb") as file:
+        #     pickle.dump((self.Xs, self.Ys), file)
         print(f"Dataset with len of {self.__len__()}")
 
     def __len__(self):
         return 1 + (self.Ys.shape[1] - self.window) // self.step_size
+
+    def _resample(self, x):
+        return resample(x, self.sampling_rate, axis=1)
 
     def load_files(self):
         Xs, Ys = [], []
@@ -46,12 +69,14 @@ class WESADLoader(torch.utils.data.Dataset):
                 # each sample sensor has the shape of (seconds, channels, frequency)
                 sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
             
-            arrays = [torch.tensor(resample(sample[sensor].mean(1), self.sampling_rate, axis=1)).reshape((1, -1)) 
+            # mean(1) converts (#qseconds, channels, freq) -> (#qseconds, freq)
+            arrays = [torch.tensor(self.change_freq(sample[sensor].mean(1))).reshape((1, -1)) 
                     for sensor in sample.keys() 
                     if sensor in self.sensors]
+            
             X = torch.concat(arrays)
-            # Y = sample['label'].mode(1).values
-            Y = sample['label'] # in new version label is for each qsecond
+            Y = sample['label'].mode(1).values
+            # Y = sample['label'] # in new version label is for each qsecond
             Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1) # to 200 sampling rate
             
             X = X / (
@@ -61,6 +86,19 @@ class WESADLoader(torch.utils.data.Dataset):
             )
             with open("log.txt", "a") as file:
                 file.write(f"Init sizes = X: {X.shape}, Y: {Y.shape}\n")
+            
+            if self.imbalance_dels:
+                Y = Y.squeeze()
+                with open("log.txt", "a") as file:
+                    file.write(f"Before imbalance: X: {X.shape}, Y: {Y.shape} (2s: {(Y == 2).sum()}, not2s: {(Y != 2).sum()})\n")
+                twos = (Y == 2).nonzero()
+                first, last = twos[0].item(), twos[-1].item()
+                Y = torch.concat((Y[120000:first-self.imbalance_dels], Y[first:last+1], Y[last+1+self.imbalance_dels:-80000]))
+                X = torch.concat((X[:, 120000:first-self.imbalance_dels], X[:, first:last+1], X[:, last+1+self.imbalance_dels:-80000]), dim=1)
+                with open("log.txt", "a") as file:
+                    file.write(f"After imbalance: X: {X.shape}, Y: {Y.shape} (2s: {(Y == 2).sum()}, not2s: {(Y != 2).sum()})\n")
+                Y = Y.unsqueeze(0)
+                
             Xs.append(X)
             Ys.append(Y)
             # with open("log.txt", "a") as file:
@@ -76,14 +114,17 @@ class WESADLoader(torch.utils.data.Dataset):
     def __getitem__(self, index):
         index *= self.step_size
         x = self.Xs[:, index:index + self.window]
-        with open("log.txt", "a") as file:
-            file.write(f"___get item = x: {x.shape}, i = {index}, w = {self.window}\n")
         y = self.Ys[:, index:index + self.window]
         y = y.mode().values.item()
-        y = 1 if y == 2 else 0
+        if self.n_classes <= 2: # 0: baseline, 1: stress
+            y = 1 if y == 2 else 0
+        elif self.n_classes == 3: # 0: baseline, 1: stress, 2: amusement
+            y = 1 if y == 2 else 2 if y == 3 else 0
         y = torch.tensor([y])
         if self.to_seconds:
             x = x.reshape((x.shape[0], -1, 4)).mean(2)
+        with open("log.txt", "a") as file:
+            file.write(f"___get item = x: {x.shape}, y: {y.shape}, i = {index}, w = {self.window}\n")
         
         return x.type(torch.float32), y.type(torch.float32)
 

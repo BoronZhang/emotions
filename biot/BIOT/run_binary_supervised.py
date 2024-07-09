@@ -71,7 +71,7 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         if y.sum() == 0: # handling all 0 or all 1
             y[random.choice(range(len(y)))] = 1
-        elif y.sum() == len(y):
+        elif (y ==1).sum() == len(y):
             y[random.choice(range(len(y)))] = 0
         # else:
             # print(f"\n\033[93mWWhhooww\033[0m")
@@ -97,7 +97,7 @@ class LitModel_finetune(pl.LightningModule):
         # print(f"\n\033[94mgt =\n{gt}: {result.shape}\033[0m")
         
         if (
-            sum(gt) * (len(gt) - sum(gt)) != 0
+            (gt == 0).sum() == len(gt) or (gt == 1).sum() == len(gt) or (gt == 2).sum() == len(gt)
         ):  # to prevent all 0 or all 1 and raise the AUROC error
             self.threshold = np.sort(result)[-int(np.sum(gt))]
             result = binary_metrics_fn(
@@ -129,7 +129,7 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         if y.sum() == 0: # handling all 0 or all 1
             y[random.choice(range(len(y)))] = 1
-        elif y.sum() == len(y):
+        elif (y == 1).sum() == len(y):
             y[random.choice(range(len(y)))] = 0
         with torch.no_grad():
             convScore = self.model(X)
@@ -145,7 +145,7 @@ class LitModel_finetune(pl.LightningModule):
             result = np.append(result, out[0])
             gt = np.append(gt, out[1])
         if (
-            sum(gt) * (len(gt) - sum(gt)) != 0
+            (gt == 0).sum() == len(gt) or (gt == 1).sum() == len(gt) or (gt == 2).sum() == len(gt)
         ):  # to prevent all 0 or all 1 and raise the AUROC error
             result = binary_metrics_fn(
                 gt,
@@ -210,7 +210,8 @@ def prepare_WESAD_dataloader(args):
     # print(f"Nom of:\n\tTrain: {len(train_files)}\n\tVal:   {len(val_files)}\n\tTest:  {len(test_files)}")
 
     # prepare training and test data loader
-    loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size, "sensors": args.sensors}
+    loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size, 
+                   "sensors": args.sensors, "imbalance_dels": args.imbalance_dels}
     print(f"Experiment with sensors:\n")
     for s in args.sensors:
         print(f"\t- {s}")
@@ -381,7 +382,6 @@ class Supervised:
         self.args = args
     def supervised_go(self):
         args = self.args
-        # print("Welcome")
         # get data loaders
         if args.dataset == "TUAB":
             train_loader, test_loader, val_loader = prepare_TUAB_dataloader(args)
@@ -470,13 +470,13 @@ class Supervised:
             version=version,
             name="log",
         )
-        checkpoint_callback = ModelCheckpoint(
-            monitor="val_auroc",
-            dirpath="./checkpoints",
-            filename=f"{version}" + "-{epoch:02d}-{val_auroc:.2f}",
-            save_top_k=1,
-            mode="max",
-        )
+        # checkpoint_callback = ModelCheckpoint(
+        #     monitor="val_auroc",
+        #     dirpath="./checkpoints",
+        #     filename=f"{version}" + "-{epoch:02d}-{val_auroc:.2f}",
+        #     save_top_k=1,
+        #     mode="max",
+        # )
         early_stop_callback = EarlyStopping(
             monitor="val_auroc", patience=5, verbose=False, mode="max"
         )
@@ -490,7 +490,7 @@ class Supervised:
             enable_checkpointing=True,
             logger=logger,
             max_epochs=args.epochs,
-            callbacks=[early_stop_callback, checkpoint_callback],
+            callbacks=[early_stop_callback],
         )
 
         # train the model
