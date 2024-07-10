@@ -1,5 +1,6 @@
 from biot.BIOT.run_binary_supervised import Supervised
-from inputimeout import inputimeout, TimeoutOccurred
+from biot.BIOT.run_multiclass_supervised import Supervised as Supervised2
+# from inputimeout import inputimeout, TimeoutOccurred
 import json
 import time
 
@@ -14,14 +15,22 @@ class Args:
         self.model = "BIOT"
         self.in_channels = 16
         self.sample_length = 10
-        self.n_classes = 1
+        self.n_classes = 3
         self.sampling_rate = 200
         self.token_size = 200
         self.hop_length = 100
-        self.pretrain_model_path = r"C:\Users\Elham moin\Desktop\uniVer\bachProj\biot\BIOT\pretrained-models\EEG-PREST-16-channels.ckpt"
-        self.server = "pc" # or colab
+        self.server = "kaggle" # or colab
+        if self.server == "pc":
+            self.pretrain_model_path = r"C:/Users/Elham moin/Desktop/uniVer/bachProj/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt"
+        elif self.server == 'kaggle':
+            self.pretrain_model_path = r"/kaggle/input/wesad-emotion-dataset/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt"
+        elif self.server == 'colab':
+            self.pretrain_model_path = r'/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt'
         self.test = test
-        self.device = "cpu"
+        if self.server in ['kaggle', 'colab']:
+            self.device = "gpu"
+        else:
+            self.device = 'cpu'
         self.step_size = 240
         self.window_size = 240
         self.sensors = [
@@ -36,14 +45,17 @@ class Args:
             'chest_Temp',
             'chest_Resp',
         ]
+        self.imbalance_dels = 50000
+        self.logpath = "/kaggle/working/log.txt"
         
 class Main:
     def __init__(self, tests=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17], **kwargs) -> None:
         self.tests = tests
         self.kwargs = kwargs
+        self.logpath = "/kaggle/working/log.txt"
 
     def go(self):
-        with open("log.txt", "w") as file:
+        with open(self.logpath, "w") as file:
             file.write("")    
         results = {}
         for test in self.tests:
@@ -54,7 +66,8 @@ class Main:
             for key in self.kwargs:
                 if hasattr(args, key):
                     setattr(args, key, self.kwargs[key])
-            self.model = Supervised(args=args)
+            
+            self.model = Supervised2(args=args)
             results[test] = self.model.supervised_go()
             total_time = time.time() - start_time
             results[test]['time'] = total_time
@@ -68,15 +81,15 @@ class Main:
             
             with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
                 json.dump(results, file, indent=2)
-            try:
-                go = inputimeout("\033[91mWould you like to continue: \033[0m", 30)
-                print(f"test = {test}")
-                if go in ["cancel", "0", "done", "no", "n"]:
-                    break
-            except TimeoutOccurred:
-                pass
-            except KeyboardInterrupt:
-                break
+            # try:
+            #     go = inputimeout("\033[91mWould you like to continue: \033[0m", 30)
+            #     print(f"test = {test}")
+            #     if go in ["cancel", "0", "done", "no", "n"]:
+            #         break
+            # except TimeoutOccurred:
+            #     pass
+            # except KeyboardInterrupt:
+            #     break
     
     
 if __name__ == "__main__":
