@@ -15,7 +15,7 @@ class Args:
         self.model = "BIOT"
         self.in_channels = 16
         self.sample_length = 10
-        self.n_classes = 3
+        self.n_classes = 2
         self.sampling_rate = 200
         self.token_size = 200
         self.hop_length = 100
@@ -23,29 +23,29 @@ class Args:
         if self.server == "pc":
             self.pretrain_model_path = r"C:/Users/Elham moin/Desktop/uniVer/bachProj/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt"
         elif self.server == 'kaggle':
-            self.pretrain_model_path = r"/kaggle/input/wesad-emotion-dataset/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt"
+            self.pretrain_model_path = r"/kaggle/input/wesad-emotion-dataset/pretrained-models/EEG-PREST-16-channels.ckpt"
         elif self.server == 'colab':
             self.pretrain_model_path = r'/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt'
         self.test = test
         if self.server in ['kaggle', 'colab']:
-            self.device = "gpu"
+            self.device = "cuda"
         else:
             self.device = 'cpu'
         self.step_size = 240
-        self.window_size = 240
+        self.window_size = 24
         self.sensors = [
-            'wrist_ACC',
+            # 'wrist_ACC',
             'wrist_BVP',
             'wrist_EDA',
             'wrist_TEMP',
-            'chest_ACC',
-            'chest_ECG',
-            'chest_EMG',
-            'chest_EDA',
-            'chest_Temp',
-            'chest_Resp',
+            # 'chest_ACC',
+            # 'chest_ECG',
+            # 'chest_EMG',
+            # 'chest_EDA',
+            # 'chest_Temp',
+            # 'chest_Resp',
         ]
-        self.imbalance_dels = 50000
+        self.imbalance_dels = 0
         self.logpath = "/kaggle/working/log.txt"
         
 class Main:
@@ -79,7 +79,7 @@ class Main:
             }
             results["total"] = mean_results
             
-            with open(f"biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
+            with open("/".join(self.logpath.split("/")[:-1]) + f"/biot_result_{time.strftime('%Y_%b_%d_%H')}.json", "w") as file:
                 json.dump(results, file, indent=2)
             # try:
             #     go = inputimeout("\033[91mWould you like to continue: \033[0m", 30)

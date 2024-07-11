@@ -50,7 +50,7 @@ class LitModel_finetune(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         X, y = batch
         prod = self.model(X)
-        loss = nn.CrossEntropyLoss()(prod, y.squeeze())
+        loss = nn.CrossEntropyLoss()(prod, y.squeeze().type(torch.LongTensor).to(torch.device(self.args.device)))
         self.log("train_loss", loss)
         self.train_step_outputs.append(loss)
         return loss
@@ -370,7 +370,7 @@ class Supervised:
         # logger and callbacks
         version = f"{args.dataset}-{args.model}-{args.lr}-{args.batch_size}-{args.sampling_rate}-{args.token_size}-{args.hop_length}"
         logger = TensorBoardLogger(
-            save_dir="./",
+            save_dir= "../../working/" if args.server == "kaggle" else "./",
             version=version,
             name="log",
         )
@@ -400,6 +400,7 @@ class Supervised:
             model=lightning_model, ckpt_path="best", dataloaders=test_loader
         )[0]
         print(pretrain_result)
+        return pretrain_result
 
 
 if __name__ == "__main__":

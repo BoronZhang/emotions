@@ -11,7 +11,7 @@ from typing import Literal
 
 class WESADLoader(torch.utils.data.Dataset):
     def __init__(self, files, sensors, n_classes=2, window_size=1, step_size=1, sampling_rate=200, to_seconds=True, 
-                 imbalance_dels=0, feat_meth:Literal['resample', 'pca', 'autoencoder']="resample"):
+                 imbalance_dels=0, feat_meth:Literal['resample', 'pca', 'autoencoder']="resample", logpath="log.txt"):
         """
         Parameters:
         ----
@@ -37,6 +37,7 @@ class WESADLoader(torch.utils.data.Dataset):
         self.to_seconds = to_seconds
         self.imbalance_dels = imbalance_dels
         self.n_classes = n_classes
+        self.logpath = logpath
         
         self.window = window_size * sampling_rate
         self.sampling_rate = sampling_rate
@@ -84,29 +85,29 @@ class WESADLoader(torch.utils.data.Dataset):
                 # np.quantile(np.abs(X), q=0.95, method="linear", axis=-1, keepdims=True)
                 + 1e-8
             )
-            with open("log.txt", "a") as file:
+            with open(self.logpath, "a") as file:
                 file.write(f"Init sizes = X: {X.shape}, Y: {Y.shape}\n")
             
             if self.imbalance_dels:
                 Y = Y.squeeze()
-                with open("log.txt", "a") as file:
+                with open(self.logpath, "a") as file:
                     file.write(f"Before imbalance: X: {X.shape}, Y: {Y.shape} (2s: {(Y == 2).sum()}, not2s: {(Y != 2).sum()})\n")
                 twos = (Y == 2).nonzero()
                 first, last = twos[0].item(), twos[-1].item()
                 Y = torch.concat((Y[120000:first-self.imbalance_dels], Y[first:last+1], Y[last+1+self.imbalance_dels:-80000]))
                 X = torch.concat((X[:, 120000:first-self.imbalance_dels], X[:, first:last+1], X[:, last+1+self.imbalance_dels:-80000]), dim=1)
-                with open("log.txt", "a") as file:
+                with open(self.logpath, "a") as file:
                     file.write(f"After imbalance: X: {X.shape}, Y: {Y.shape} (2s: {(Y == 2).sum()}, not2s: {(Y != 2).sum()})\n")
                 Y = Y.unsqueeze(0)
                 
             Xs.append(X)
             Ys.append(Y)
-            # with open("log.txt", "a") as file:
+            # with open(self.logpath, "a") as file:
             #     file.write(f"Loading file {file_index}/{len(self.files)}: X = {X.shape}, Y = {Y.shape}\n")
             # self.datasets[file_index] = (X, Y)
         self.Xs = torch.concat(Xs, dim=1)
         self.Ys = torch.concat(Ys, dim=1)
-        with open("log.txt", "a") as file:
+        with open(self.logpath, "a") as file:
             file.write(f"Loaded: Xs: {self.Xs.shape}, Ys: {self.Ys.shape}: (0s: {(self.Ys == 2).sum()}, 1s: {(self.Ys != 2).sum()})\n")
         
 
@@ -123,7 +124,7 @@ class WESADLoader(torch.utils.data.Dataset):
         y = torch.tensor([y])
         if self.to_seconds:
             x = x.reshape((x.shape[0], -1, 4)).mean(2)
-        with open("log.txt", "a") as file:
+        with open(self.logpath, "a") as file:
             file.write(f"___get item = x: {x.shape}, y: {y.shape}, i = {index}, w = {self.window}\n")
         
         return x.type(torch.float32), y.type(torch.float32)
