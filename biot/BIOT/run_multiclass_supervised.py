@@ -151,7 +151,7 @@ def prepare_WESAD_dataloader(args):
 
     # prepare training and test data loader
     loader_args = {'sampling_rate': args.sampling_rate, 'window_size': args.window_size, 'step_size': args.step_size, 
-                   "sensors": args.sensors, "imbalance_dels": args.imbalance_dels, 'logpath': args.logpath}
+                   "sensors": args.sensors, "imbalance_dels": args.imbalance_dels, 'logpath': args.logpath, 'feat_meth': args.feat_meth}
     print(f"Experiment with sensors:\n")
     for s in args.sensors:
         print(f"\t- {s}")

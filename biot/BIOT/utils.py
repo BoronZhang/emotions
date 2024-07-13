@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import os
 from scipy.signal import resample, butter, iirnotch, filtfilt, lfilter
 from scipy.interpolate import interp1d
+from sklearn.decomposition import PCA
 
 from typing import Literal
 
@@ -46,7 +47,11 @@ class WESADLoader(torch.utils.data.Dataset):
         if feat_meth == 'resample':
             self.change_freq = self._resample
         elif feat_meth == 'pca':
-            pass
+            for sensor in self.sensors:
+                if "chest" not in sensor:
+                    raise ValueError("PCA can only be applied on chest signals")
+            self.change_freq = self._pca
+            
         elif feat_meth == 'autoencoder':
             pass
         else:
@@ -60,8 +65,18 @@ class WESADLoader(torch.utils.data.Dataset):
     def __len__(self):
         return 1 + (self.Ys.shape[1] - self.window) // self.step_size
 
+    def _to_seconds(self, data:torch.Tensor):
+        if self.to_seconds:
+            return data[:4*(data.shape[0]//4), :].reshape(-1, data.shape[1] * 4)
+        else:
+            return data
+        
     def _resample(self, x):
         return resample(x, self.sampling_rate, axis=1)
+    
+    def _pca(self, x):
+        pca = PCA(self.sampling_rate)
+        return pca.fit_transform(x)
 
     def load_files(self):
         Xs, Ys = [], []
@@ -122,8 +137,6 @@ class WESADLoader(torch.utils.data.Dataset):
         elif self.n_classes == 3: # 0: baseline, 1: stress, 2: amusement
             y = 1 if y == 2 else 2 if y == 3 else 0
         y = torch.tensor([y])
-        if self.to_seconds:
-            x = x.reshape((x.shape[0], -1, 4)).mean(2)
         with open(self.logpath, "a") as file:
             file.write(f"___get item = x: {x.shape}, y: {y.shape}, i = {index}, w = {self.window}\n")
         
