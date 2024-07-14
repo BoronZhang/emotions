@@ -64,8 +64,8 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         with torch.no_grad():
             convScore = self.model(X)
-            step_result = convScore.cpu().numpy()
-            step_gt = y.cpu().numpy()
+            step_result = convScore.detach().cpu().numpy()
+            step_gt = y.detach().cpu().numpy()
         
         self.val_step_outputs.append((step_result, step_gt))
         return step_result, step_gt
@@ -90,8 +90,8 @@ class LitModel_finetune(pl.LightningModule):
         X, y = batch
         with torch.no_grad():
             convScore = self.model(X)
-            step_result = convScore.cpu().numpy()
-            step_gt = y.cpu().numpy()
+            step_result = convScore.detach().cpu().numpy()
+            step_gt = y.detach().cpu().numpy()
         self.test_step_outputs.append((step_result, step_gt))
         return step_result, step_gt
 
@@ -379,8 +379,8 @@ class Supervised:
         )
 
         trainer = pl.Trainer(
-            devices=[0],
-            accelerator="gpu",
+            devices="auto",
+            accelerator=args.device,
             strategy=DDPStrategy(find_unused_parameters=False),
             # auto_select_gpus=True,
             benchmark=True,
@@ -397,7 +397,7 @@ class Supervised:
 
         # test the model
         pretrain_result = trainer.test(
-            model=lightning_model, ckpt_path="best", dataloaders=test_loader
+            model=lightning_model, dataloaders=test_loader
         )[0]
         print(pretrain_result)
         return pretrain_result

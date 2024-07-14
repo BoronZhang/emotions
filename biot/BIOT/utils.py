@@ -71,12 +71,13 @@ class WESADLoader(torch.utils.data.Dataset):
         else:
             return data
         
-    def _resample(self, x):
-        return resample(x, self.sampling_rate, axis=1)
+    def _resample(self, x) -> torch.Tensor:
+        return torch.tensor(resample(x, self.sampling_rate, axis=1))
     
     def _pca(self, x):
         pca = PCA(self.sampling_rate)
-        return pca.fit_transform(x)
+        ans = torch.tensor(pca.fit_transform(x))
+        return ans
 
     def load_files(self):
         Xs, Ys = [], []
@@ -86,13 +87,12 @@ class WESADLoader(torch.utils.data.Dataset):
                 sample:dict[str, torch.Tensor] = pickle.load(pklfile, encoding='bytes')
             
             # mean(1) converts (#qseconds, channels, freq) -> (#qseconds, freq)
-            arrays = [torch.tensor(self.change_freq(sample[sensor].mean(1))).reshape((1, -1)) 
+            arrays = [self.change_freq(self._to_seconds(sample[sensor].mean(1))).reshape((1, -1)) 
                     for sensor in sample.keys() 
                     if sensor in self.sensors]
             
             X = torch.concat(arrays)
-            Y = sample['label'].mode(1).values
-            # Y = sample['label'] # in new version label is for each qsecond
+            Y = self._to_seconds(sample['label']).mode(1).values.type(torch.int32)
             Y = Y.reshape(-1, 1).expand(Y.shape[0], 200).reshape(1, -1) # to 200 sampling rate
             
             X = X / (
@@ -132,7 +132,7 @@ class WESADLoader(torch.utils.data.Dataset):
         x = self.Xs[:, index:index + self.window]
         y = self.Ys[:, index:index + self.window]
         y = y.mode().values.item()
-        if self.n_classes <= 2: # 0: baseline, 1: stress
+        if self.n_classes <= 2: #   0: baseline, 1: stress
             y = 1 if y == 2 else 0
         elif self.n_classes == 3: # 0: baseline, 1: stress, 2: amusement
             y = 1 if y == 2 else 2 if y == 3 else 0

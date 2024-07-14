@@ -1,5 +1,9 @@
-from biot.BIOT.run_binary_supervised import Supervised
-from biot.BIOT.run_multiclass_supervised import Supervised as Supervised2
+try:
+    from biot.BIOT.run_binary_supervised import Supervised
+    from biot.BIOT.run_multiclass_supervised import Supervised as Supervised2
+except ModuleNotFoundError:
+    from run_binary_supervised import Supervised
+    from run_multiclass_supervised import Supervised as Supervised2
 # from inputimeout import inputimeout, TimeoutOccurred
 import json
 import time
@@ -10,8 +14,8 @@ class Args:
         self.epochs = 50
         self.lr = 1e-3
         self.weight_decay = 1e-5
-        self.batch_size = 64
-        self.num_workers = 4
+        self.batch_size = 16
+        self.num_workers = 2
         self.dataset = "WESAD"
         self.model = "BIOT"
         self.in_channels = 16
@@ -37,18 +41,18 @@ class Args:
         ]
         self.imbalance_dels = 0
         self.feat_meth = "resample"
-        self.set_server("kaggle")
+        # self.set_server("kaggle")
     def set_server(self, server):
         if server not in ['pc', 'colab', 'kaggle']:
             raise ValueError("Server not defined")
         self.server = server
         print(f"server set as {server}")
         if self.server == "pc":
-            self.pretrain_model_path = r"C:/Users/Elham moin/Desktop/uniVer/bachProj/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt"
+            self.pretrain_model_path = r""
         elif self.server == 'kaggle':
             self.pretrain_model_path = r"/kaggle/input/wesad-emotion-dataset/pretrained-models/EEG-PREST-16-channels.ckpt"
         elif self.server == 'colab':
-            self.pretrain_model_path = r'/biot/BIOT/pretrained-models/EEG-PREST-16-channels.ckpt'
+            self.pretrain_model_path = r'pretrained-models/EEG-PREST-16-channels.ckpt'
         
         
         if server == "kaggle":
@@ -74,6 +78,8 @@ class Args:
             self.sensors = ['wrist_BVP', 'wrist_EDA', 'wrist_TEMP',]
         elif args.sensors == "all_chest_nacc":
             self.sensors = ['chest_ECG', 'chest_EMG', 'chest_EDA', 'chest_Temp', 'chest_Resp',]
+        elif args.sensors == "all_nacc":
+            self.sensors = ['wrist_BVP', 'wrist_EDA', 'wrist_TEMP', 'chest_ECG', 'chest_EMG', 'chest_EDA', 'chest_Temp', 'chest_Resp',]
         else:
             self.sensors = [args.sensors]
         
@@ -89,9 +95,9 @@ class Args:
 
 class Main:
     def __init__(self, tests=[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17], manual_args=None) -> None:
-        self.tests = tests
+        self.tests = tests[manual_args.start:]
         self.args = manual_args
-        self.logpath = "/kaggle/working/log.txt" if manual_args == 'kaggle' else 'log.txt'
+        self.logpath = "/kaggle/working/log.txt" if manual_args.server == 'kaggle' else 'log.txt'
 
     def go(self):
         with open(self.logpath, "w") as file:
@@ -105,8 +111,10 @@ class Main:
             if self.args:
                 args.update_by_parser_args(self.args)
             
-            self.model = Supervised2(args=args)
-            results[test] = self.model.supervised_go()
+            model = Supervised2(args=args)
+            results[test] = model.supervised_go()
+            del model
+
             total_time = time.time() - start_time
             results[test]['time'] = total_time
             print(f"\033[92mTotal time: {total_time} secs\033[0m")
@@ -138,6 +146,7 @@ if __name__ == "__main__":
     parser.add_argument("--nclasses", type=int, default=2, required=False)
     parser.add_argument("--featmeth", type=str, default="resample", required=False)
     parser.add_argument("--server", type=str, default="kaggle", required=False)
+    parser.add_argument("--start", type=int, default=0, required=False)
     manual_args = parser.parse_args()
     print(manual_args._get_kwargs())
 
