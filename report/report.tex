@@ -142,10 +142,10 @@
 			\hline
 			\english{Affective State Recognition with Convolutional Autoencoders\cite{convAE1}} & \english{All the signals} &‌ پنجره: 1 ثانیه‌، قدم: 1 ثانیه & \english{3class: 82.82}\\
 			\hline
-			\english{Stress Detection by Machine Learning and Wearable Sensors} &‌ \english{Manual features from all the chest signals} &
+			\english{Stress Detection by Machine Learning and Wearable Sensors\cite{art2021}} &‌ \english{Manual features from all the chest signals} &
 			 پنجره: 10 ثانیه، قدم: 10 ثانیه & \english{2class: 83.34, 3class: 65.73}\\
 			\hline
-			\english{A Transformer Architecture for Stress Detection from ECG\cite{art2021}} & \english{ECG} & پنجره: 30 ثانیه‌، قدم: 1 ثانیه &‌ \english{2class: 83.3}\\
+			\english{A Transformer Architecture for Stress Detection from ECG\cite{behnam2021}} & \english{ECG} & پنجره: 30 ثانیه‌، قدم: 1 ثانیه &‌ \english{2class: 83.3}\\
 			
 			\hline
 		\end{tabular}
@@ -153,6 +153,70 @@
 		\label{related}
 		
 	\end{table}
+	
+	\subsection{روش شناسی}
+	در ادادمه به بررسی روش استفاده شده در هر یک از کارهای نام برده شده می‌پردازیم:
+	\begin{itemize}
+		\item [$\bullet$]
+		\english{Introducing WESAD, a Multimodal Dataset for Wearable
+			Stress and Affect Detection\cite{wesad}}:\\
+		
+		در اینجا از استخراج ویژگی‌های پیچیده‌ای استفاده گردیده‌است. برای \english{ACC} میانگین و انحراف معیار برای هر یک از ابعاد شناسایی و با هم جمع شده و علاوه بر آن نقطه اوج هر یک نیز محاسبه گردیده.\\
+		از سیگنال‌های \english{ECG} و \english{BVP} میانگین و واریانس آنها و همجنین از نقاط پیک آنها ضربان قلب و از زمان های ضربان قلب، تغییرات آن\footnote{\english{Heart Rate Variability}} به دست می‌آید.\\
+		برای \english{EDA} ابتدا یک فیلتر پایین‌گذر\footnote{\english{low pass filter}} 5 هرتزی بر روی آن اعمال و میانگین و واریانس محاسبه می‌شود. همچنین دو بخش تونیک و فازیک این سیگنال (به نام‌های \english{Skin Conductance Level} و \english{Skin Conductance Response}) با توجه به کار \cite{eda} استخراج شدند.\\
+		بر روی سیگنال \english{EMG} ابتدا یک فیلتر بالاگذر\footnote{\english{high pass filter}} اعمال و سپس نقاط پیک شناسایی شدند و چندین ویژگی دیگر با توجه به کار \cite{emg} استخراج شدند.\\
+		برای \english{Resp} ایتدا یک فیلتر میان‌گذر
+		 \footnote{\english{band pass filter}} بر روی آن اعمال شدند. پیک‌ها شناسایی و میانگین و واریانس دم و بازدم‌ها محاسبه شدند. علاوه بر آنها نسبت دم به بازدم، حجم تنفس، نرخ تنفس و مدت زمان تنفس نیز محاسبه گردیدند.\\
+		برای دما، میانگین و واریانس و بیشینه و کمینه و شیب آن محاسبه گردیده بود.\\
+		برای انجام کلاسیفیکیشن، 5 روش دسته‌بندی
+		\emph{درخت تصمیم}\footnote{\english{Decision Tree}}
+		 \emph{جنگل تصادفی}\footnote{\english{Random Forest}}،
+		‌ \emph{\english{k}-همسایه-نزدیک}\footnote{\english{K-Nearest-Neighbor}}، 
+		\emph{تحلیل تشخیصی خطی}\footnote{\english{Linear Discriminant Analysis}} و
+		\emph{\english{AdaBoost}} 
+		استفاده شدند.
+		\item [$\bullet$]
+		\english{Transformer-based Self-supervised Multimodal
+			Representation Learning for Wearable Emotion
+			Recognition\cite{transformer1}}:\\
+		
+		ابتدا چندین تبدیل روی هر پنجره اتفاق می‌افتد:
+		\begin{enumerate}
+			\item 
+			\textbf{جایگشت:}
+			قسمت‌های مختلف پنجره حدا شده و سپس با جایگشتی دیگر به هم چسبانده می‌شوند.
+			\item 
+			\textbf{پیچ و تاب زمانی: }
+			پنجره سیگنال به \english{n} قسمت تقسیم شده و نیمی از آنها منبسط و نیمی دیگر منقبض می‌شوند.
+			\item 
+			\textbf{برش: }
+			با تقسیم پنجره به \english{n} قسمت، یکی را حذف کرده و دوباره نمونه‌گیری می‌کنیم.
+		\end{enumerate}
+		\begin{figure}[h]
+			\includegraphics[width=\textwidth]{self_super_trans.png}
+			\caption{
+				معماری مدل مقاله \cite{transformer1}. مدل ترانسفورمر اصلی از یک توجه چندکله‌‌ای (\english{Multi-Head Attention})  و سپس نرمال‌ساز لایه (\english{Layer Normalization})  و سپس یک لایه کامل‌متصل (\english{Fully Connected}) و دوباره یک نرمال‌ساز لایه دیگر.
+			}
+			\label{trans1model}
+		\end{figure}
+		
+		معماری مدل در شکل \ref{trans1model} آورده شده‌است.	مرحله آموزش شامل دو مرحله بوده. اول پیش‌آموزش آن روی دادگان \english{PRESAGE}\cite{presage} انجام می‌شود. در مرحله دوم از انکودر مدل پیش‌اموزش داده شده برای کلاسیفیکیشن استفاده می‌شود.
+		\item [$\bullet$]
+		\english{Affective State Recognition with Convolutional Autoencoders\cite{convAE1}}:\\
+		
+		
+		\item [$\bullet$]
+		\english{Stress Detection by Machine Learning and Wearable Sensors\cite{art2021}}:\\
+		در این کار بیشینه، کمینه، میانگین و انحراف معیار پنجره‌های 10 ثانیه‌ای بدون اشتراک به دست آورده شده است و سپس با بهره‌گیری از 5 روش دسته‌بندی \emph{جنگل تصادفی}،
+		‌ \emph{\english{k}-همسایه-نزدیک}، 
+		\emph{تحلیل تشخیصی خطی}،
+		 \emph{\english{AdaBoost}} 
+		و \emph{ماشین بردار پشتیبان}\footnote{\english{Support Vector Machine}}،
+		 آن‌ها را دسته‌بندی کرده‌اند.
+		\item [$\bullet$]
+		\english{A Transformer Architecture for Stress Detection from ECG\cite{behnam2021}}:\\
+		
+	\end{itemize} 
 	\section{پیش‌پردازش}
 	در بخش‌های پیش‌رو در مورد کارهای مورد نیاز برای آماده‌سازی داده‌ها برای آموزش مدل‌ها بحث می‌کنیم
 	
@@ -261,7 +325,15 @@
 	
 	در می‌آید.\\
 	
-	برای تغییر فرکانس از تابع \english{resample} از پکیج \english{scipy} بهره بردیم. این تابع از متود فوریه برای تبدیل فرکانس یک سیگنال استفاده می‌گند.
+	برای تغییر فرکانس دو تابع مختلف استفاده کردیم:
+	
+	\begin{enumerate}
+		\item 
+		یکی از بهترین روش‌ها برای این کار بهره‌گیری از \english{PCA} است. این روش را تنها برای سیگنال‌های سینه می‌شود استفاده کرد، چراکه \english{PCA} تنها می‌تواند ابعاد را کم کند و سیگنال‌های مچ‌بند در بیشترین حالت 64 هرتز هستند.
+		
+		\item
+		 روش دیگر استفاده از تابع \english{resample} از پکیج \english{scipy} بود. این تابع از متود فوریه برای تبدیل فرکانس یک سیگنال استفاده می‌کند. از این روش می‌توان برای همه سیگنال‌ها استفاده کرد.
+	\end{enumerate}
 	
 	\subparagraph{نرمال‌سازی}
 	
@@ -313,40 +385,80 @@
 	
 	
 	\subsection{3 کلاسه}
-	با بهره‌گیری از این مدل قدرتمند به نتایج بسیار بهتری در کلاس‌بندی با 3 کلاس خواهیم رسید. 3 کلاس عبارتند از استرس،‌ خوشحالی و عادی.\\
+	در قدم بعدی این مدل را برای 3 کلاس تست کردیم. 3 کلاس عبارتند از استرس،‌ خوشحالی و عادی. در ادامه این کار را با سیگنال‌های مختلف بررسی کردیم:\\
+	
+	\subsubsection{سیگنال‌های سینه‌ای}
+	\begin{table}[h]
+		\begin{tabular}{|c|c|c|}
+			\hline
+			سوژه & امتیاز \english{F-1} & \english{Accuracy}\\
+			\hline
+			2&$0.75$&$0.64$\\
+			3&$0.54$&$0.57$\\
+			4&$0.85$&$0.78$\\
+			5&$0.23$&$0.18$\\
+			6&$0.77$&$0.67$\\
+			7&$0.54$&$0.59$\\
+			8&$0.85$&$0.78$\\
+			9&$0.77$&$0.67$\\
+			10&$0.77$&$0.67$\\
+			11&$0.77$&$0.67$\\
+			13&$0.85$&$0.78$\\
+			14&$0.77$&$0.67$\\
+			15&$0.85$&$0.78$\\
+			16&$0.85$&$0.81$\\
+			17&$0.77$&$0.67$\\
+			\hline
+			مجموع&$0.78$&$0.71$\\
+			\hline
+		\end{tabular}
+		\caption{همانند \ref{compare1}، با تفاوت اینکه در اینجا 3 کلاس را مقایسه کردیم. در اینجا تمام سنسورهای سینه و به وسیله \english{PCA} بررسی شده‌اند.}
+		\label{compare2}
+		
+	\end{table}
+	
+	اولین آزمایش  که نتایج آن در جدول\ref{compare2} آمده، را با بهره‌گیری از \english{PCA} و سیگنال‌های سینه انجام دادیم. نتایج آن به نسبت کار \cite{art2021} که از سیگنال‌های سینه بهره برده بود، حدود 10\% امتیاز \english{F-1} بهتری داشت.\\
+	
+	سپس آزمایش مشابهی را این بار با \english{resample} به جای \english{PCA} انجام دادیم. بدین صورت که به جای اینکه اجزای اصلی پنجره را به دست آوریم، یک نمونه پریودیک به وسیله فوریه از آن بگیریم و از آن استفاده کنیم.\\
 	
 	\begin{table}[h]
 		\begin{tabular}{|c|c|c|}
 			\hline
 			سوژه & امتیاز \english{F-1} & \english{Accuracy}\\
 			\hline
-			2&0.92&0.91\\
-			3&0.78&0.73\\
-			4&0.96&0.96\\
-			5&0.98&0.98\\
-			6&0.84&0.80\\
-			7&0.84&0.83\\
-			8&0.86&0.83\\
-			9&0.80&0.73\\
-			10&0.87&0.87\\
-			11&0.73&0.75\\
-			13&0.96&0.96\\
-			14&0.57&0.59\\
-			15&0.96&0.96\\
-			16&1.00&1.0\\
-			17&0.70&0.72\\
+			2&$0.75$&$0.64$\\
+			3&$0.77$&$0.67$\\
+			4&$1.0$&$1.0$\\
+			5&$1.0$&$1.0$\\
+			6&$0.85$&$0.81$\\
+			7&$0.77$&$0.74$\\
+			8&$0.69$&$0.74$\\
+			9&$0.85$&$0.85$\\
+			10&$0.77$&$0.67$\\
+			11&$0.77$&$0.67$\\
+			13&$1.0$&$1.0$\\
+			14&$0.46$&$0.46$\\
+			15&$0.85$&$0.86$\\
+			16&$0.92$&$0.92$\\
+			17&$0.69$&$0.63$\\
 			\hline
-			مجموع&0.91&0.90\\
+			مجموع&$0.87$&$0.83$\\
 			\hline
 		\end{tabular}
-		\caption{همانند \ref{compare1}، با تفاوت اینکه در اینجا 3 کلاس را مقایسه کردیم.}
-		\label{compare2}
-		
+		\caption{نتایج 3 کلاسه با تنظیمات مشابه \ref{compare2} با تفاوت اینکه به جای استفاده از 
+			\english{PCA}
+			، از
+			 \english{resample}
+			 استفاده شده‌است.}
+		\label{compare3}
 	\end{table}
 	
+	در جدول \ref{compare3} که از \english{resample} استفاده شده،‌ نتایج به مراتب بهتری گرفتیم و \english{ّF-1 score} حدود 9\% بهتر شد. این پیشرفت قابل توجه به معنای آن است که تابع بهره گرفته از فوریه \english{resample} بسیار بهتر \english{PCA} عمل می‌کند.\\
+	در نهایت با سیگنال‌های سینه به تنهایی، در امتیاز \english{F-1} به 87\% رسیدیم که از مدل تمام سینه \cite{art2021} که از مدل‌های کلاسیفیکیشن کلاسیک مانند  حدود 20\% بهتر است
 	
-	در جدول \ref{compare2} نتایج برای 3 کلاس با تنظیمات مشابه \ref{compare1} آورده شده‌است. امتیاز \english{f-1} به طور فوق‌العاده‌ای به بیش از 90\% رسید که بسیار بهتر از امتیازهای 3 کلاسه دیگر مقالات است!\\
+	\subsubsection{سیگنال‌های مچ}
 	
+	\subsubsection{روند}
 	\begin{figure}[h]
 		\includegraphics[width=0.6\textwidth]{traj1.png}
 		\caption{روند پیشرفت دقت و معیارهای دیگر در طول فرایند یادگیری. نقطه آخر این نمودارها بیانگر دقت بر روی تست است.}
@@ -360,7 +472,7 @@
 	\newpage
 	\begin{thebibliography}{9}
 		\bibitem{wesad}
-		\href{https://eclass.hmu.gr/modules/document/file.php/ECE224/Project/2018_Introducing%20WESAD%2C%20a%20Multimodal%20Dataset%20for%20Wearable%20Stress%20and%20Affect%20Detection.pdf}{\english{Schmidt, P., Reiss, A., Duerichen, R., Marberger, C., and Van Laerhoven,
+		\href{https://www.eti.uni-siegen.de/ubicomp/papers/ubi_icmi2018.pdf}{\english{Schmidt, P., Reiss, A., Duerichen, R., Marberger, C., and Van Laerhoven,
 			K. (2018, October). Introducing wesad, a multimodal dataset for wearable
 			stress and affect detection. In Proceedings of the 20th ACM international
 			conference on multimodal interaction (pp. 400-408)}}
@@ -388,6 +500,15 @@
 		
 		\bibitem{convAE1}
 		\href{https://ieeexplore.ieee.org/abstract/document/9871958/}{\english{Rovinska, S., \& Khan, N. (2022, July). Affective State Recognition with Convolutional Autoencoders. In 2022 44th Annual International Conference of the IEEE Engineering in Medicine \& Biology Society (EMBC) (pp. 4664-4667). IEEE.}}
+		
+		\bibitem{eda}
+		\href{https://d1wqtxts1xzle7.cloudfront.net/46331492/Development_and_evaluation_of_an_ambulat20160607-12318-qo3cq4-libre.pdf?1465369302=&response-content-disposition=inline%3B+filename%3DDevelopment_and_Evaluation_of_an_Ambulat.pdf&Expires=1721053982&Signature=Xj8-dl5REXUsPQzRKpGBhbpRRdCIfE7xJHAwh1tWzK9sB4mk8yOTQHRvY2mKmr-1bkJU063LsHYaxzKVzHiNMQG-TDDxJ-EIdRZHvcyLpJY-4PpwI7VElvdRlGLcedRTCHEPlwsnPSumNmbH6QD4LZwELRnGlgE8Q-s~GCPUdeXeiw-k4~Af6rKjE6HeeurDs6w~M4OIPYFNIp8E6X4pnrWyLb8ufqaijyVt9fw5xZUbECAdgS0XC2leTaTKqfBgUy~Rh7Zb0DtfWHdK9XKXrFTmYl2Ts0R62tYeRpRxRmb-T0-0fOXxyDq7DSjH7ASyJtHOqAo-pd7invFsaFRGbg__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA}{\english{Choi, J., Ahmed, B., \& Gutierrez-Osuna, R. (2011). Development and evaluation of an ambulatory stress monitor based on wearable sensors. IEEE transactions on information technology in biomedicine, 16(2), 279-286.}}
+		
+		\bibitem{emg}
+		\href{https://dl.acm.org/doi/abs/10.1145/2485984.2485987}{\english{Wijsman, J., Grundlehner, B., Penders, J., \& Hermens, H. (2013). Trapezius muscle EMG as predictor of mental stress. ACM transactions on embedded computing systems (TECS), 12(4), 1-20.}}
+		
+		\bibitem{presage}
+		\href{https://medecine.univ-lille.fr/presage}{\english{PRESAGE dataset}}
 	\end{thebibliography}
 	
 \end{document}
